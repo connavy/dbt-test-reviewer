@@ -1,0 +1,1422 @@
+<!DOCTYPE html><html lang="ja"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>dbt Test Reviewer</title>
+<style>
+:root{--bg:#0f1117;--sf:#181b24;--sf2:#1e222d;--bd:#2a2f3c;--tx:#e4e6ec;--txd:#8b90a0;--txm:#5c6175;
+--ac:#56d364;--acb:rgba(86,211,100,.08);--bl:#58a6ff;--blb:rgba(88,166,255,.08);
+--or:#d29922;--orb:rgba(210,153,34,.08);--rd:#f85149;--rdb:rgba(248,81,73,.08);
+--pu:#bc8cff;--pub:rgba(188,140,255,.08);--cy:#39d2c0;--cyb:rgba(57,210,192,.08);
+--fn:'JetBrains Mono','Fira Code',monospace;--fs:'DM Sans','Segoe UI',system-ui,sans-serif;}
+html.light{--bg:#ffffff;--sf:#f6f8fa;--sf2:#eef1f5;--bd:#d1d9e0;--tx:#1f2328;--txd:#59636e;--txm:#8b949e;
+--ac:#1a7f37;--acb:rgba(26,127,55,.08);--bl:#0969da;--blb:rgba(9,105,218,.08);
+--or:#9a6700;--orb:rgba(154,103,0,.08);--rd:#d1242f;--rdb:rgba(209,36,47,.08);
+--pu:#8250df;--pub:rgba(130,80,223,.08);--cy:#0891b2;--cyb:rgba(8,145,178,.08);}
+.theme-toggle{padding:4px 8px;border-radius:4px;font-size:14px;cursor:pointer;border:1px solid var(--bd);background:transparent;color:var(--txd);line-height:1;transition:all .15s}
+.theme-toggle:hover{color:var(--tx);border-color:var(--txm)}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--fs);background:var(--bg);color:var(--tx);min-height:100vh}
+.header{padding:14px 20px;border-bottom:1px solid var(--bd);background:var(--sf);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
+.header h1{font-size:15px;font-weight:700;display:flex;align-items:center;gap:10px}
+.header .icon{width:30px;height:30px;border-radius:6px;background:linear-gradient(135deg,var(--ac),var(--bl));display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:var(--bg)}
+.badge{display:inline-flex;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;font-family:var(--fn);letter-spacing:.03em;text-transform:uppercase}
+.filters{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+.filters button{padding:5px 12px;border-radius:5px;font-size:12px;font-weight:600;font-family:var(--fs);cursor:pointer;border:1px solid var(--bd);background:transparent;color:var(--txd);transition:all .15s}
+.filters button.active{color:var(--bg)}
+.progress{height:4px;border-radius:2px;background:var(--sf2);margin-bottom:20px;overflow:hidden;display:flex}
+.card{background:var(--sf);border-radius:8px;border:1px solid var(--bd);overflow:hidden;margin-bottom:14px}
+.card.untested{border-color:var(--or)}
+.card-head{padding:12px 18px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.card-head.clickable{cursor:pointer;user-select:none}
+.card-head.with-border{border-bottom:1px solid var(--bd);background:var(--sf2)}
+.card-name{font-family:var(--fn);font-size:13px;font-weight:700}
+.card-dim{color:var(--txm);font-size:12px}
+.card-body{display:none}.card-body.open{display:block}
+.review-btns{display:flex;gap:6px}
+.review-btns button{padding:4px 10px;border-radius:4px;font-size:12px;font-family:var(--fs);cursor:pointer;border:1px solid var(--bd);background:transparent;color:var(--txm);transition:all .15s}
+.review-btns button:hover{transform:translateY(-1px);box-shadow:0 2px 4px rgba(0,0,0,.2)}
+.section-label{padding:10px 18px 6px;font-size:12px;font-weight:700;font-family:var(--fs)}
+.tbl-wrap{margin:0 12px 10px;border-radius:6px;overflow-x:auto;border:1px solid var(--bd)}
+.tbl-label{padding:6px 12px;font-size:11px;font-weight:600;font-family:var(--fn);letter-spacing:.05em;text-transform:uppercase;border-bottom:1px solid var(--bd);background:var(--sf)}
+table{width:100%;min-width:480px;border-collapse:collapse;font-size:13px;font-family:var(--fn)}
+th{padding:8px 12px;text-align:left;color:var(--txd);border-bottom:2px solid var(--bd);font-weight:700;font-size:12.5px;background:var(--sf);white-space:nowrap;letter-spacing:.02em}
+td{padding:6px 12px;border-bottom:1px solid var(--bd);white-space:nowrap}
+tr:nth-child(even) td{background:rgba(255,255,255,.02)}
+tr:hover td{background:rgba(88,166,255,.06)}
+.v-null{color:var(--txm);font-style:italic}.v-true{color:var(--ac)}.v-false{color:var(--rd)}.v-num{color:var(--or)}.v-str{color:var(--bl)}
+.comment-box{width:100%;min-height:55px;padding:8px 12px;border-radius:6px;font-size:12px;font-family:var(--fs);color:var(--tx);background:var(--bg);border:1px solid var(--bd);outline:none;resize:vertical;margin-top:8px;line-height:1.5;box-sizing:border-box;transition:border-color .15s,box-shadow .15s}
+.comment-box:focus{border-color:var(--bl);box-shadow:0 0 0 1px var(--bl)}
+.config-row{display:flex;gap:8px;align-items:baseline;margin-bottom:4px}
+.config-key{font-size:11px;font-weight:600;font-family:var(--fn);color:var(--pu);min-width:50px}
+.config-val{font-size:12px;font-family:var(--fn);color:var(--bl)}
+.config-chip{font-family:var(--fn);font-size:12px;color:var(--bl);background:var(--blb);padding:3px 10px;border-radius:4px;border:1px solid rgba(88,166,255,.13);display:inline-block;margin:2px 3px}
+.config-expr{font-family:var(--fn);font-size:12px;color:var(--cy);background:var(--cyb);padding:2px 8px;border-radius:3px}
+.sql-pre{margin:0;padding:18px;font-family:var(--fn);font-size:12px;color:var(--txd);line-height:1.6;overflow-x:auto;background:rgba(0,0,0,.15);white-space:pre-wrap}
+.sql-keyword{color:#ff7b72;font-weight:600}.sql-string{color:#a5d6ff}.sql-comment{color:var(--txm);font-style:italic}.sql-number{color:#79c0ff}.sql-jinja{color:#d2a8ff}.sql-func{color:#d2a8ff;font-weight:600}
+html.light .sql-keyword{color:#cf222e}html.light .sql-string{color:#0a3069}html.light .sql-number{color:#0550ae}html.light .sql-jinja{color:#8250df}html.light .sql-func{color:#8250df}
+.raw-btn{padding:3px 8px;border-radius:4px;font-size:11px;font-family:var(--fn);cursor:pointer;border:1px solid var(--bd);background:transparent;color:var(--txm);transition:all .15s}.raw-btn:hover{color:var(--tx);border-color:var(--txm)}.raw-btn.active{color:var(--cy);border-color:var(--cy);background:var(--cyb)}
+.raw-pre{margin:0;padding:18px;font-family:var(--fn);font-size:12px;color:var(--txd);line-height:1.6;overflow-x:auto;background:rgba(0,0,0,.15);white-space:pre-wrap;border-top:1px solid var(--bd)}
+.yaml-key{color:#ff7b72}.yaml-str{color:#a5d6ff}.yaml-comment{color:#5c6175;font-style:italic}.yaml-num{color:#79c0ff}.yaml-bool{color:#ff7b72;font-weight:600}.yaml-null{color:#ff7b72;font-style:italic}.yaml-anchor{color:#d2a8ff}
+.export-panel{margin-top:24px;background:var(--sf);border-radius:10px;border:1px solid var(--bd);overflow:hidden}
+.export-head{padding:14px 18px;background:var(--sf2);border-bottom:1px solid var(--bd);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
+.export-body{padding:18px}
+.copy-btn{width:100%;padding:12px 24px;border-radius:8px;font-size:14px;font-weight:700;font-family:var(--fs);cursor:pointer;border:none;color:var(--bg);background:linear-gradient(135deg,var(--cy),var(--bl));transition:all .2s}
+.copy-btn.copied{background:var(--ac)}
+.preview-btn{width:100%;padding:8px 12px;border-radius:6px;font-size:12px;font-family:var(--fs);cursor:pointer;color:var(--txd);background:var(--bg);border:1px solid var(--bd);text-align:left;display:flex;justify-content:space-between;margin-bottom:12px}
+.preview-pre{margin:0 0 12px;padding:14px;font-family:var(--fn);font-size:12px;color:var(--txd);background:var(--bg);border-radius:6px;border:1px solid var(--bd);line-height:1.6;overflow-x:auto;white-space:pre-wrap;max-height:300px}
+.live-dot{width:8px;height:8px;border-radius:50%;background:var(--ac);display:inline-block;margin-right:6px;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.separator{height:1px;background:linear-gradient(90deg,transparent,var(--bd),transparent);margin:4px 18px}
+.model-group{margin-bottom:20px;background:var(--sf);border-radius:10px;border:1px solid var(--bd);overflow:hidden}
+.model-head{padding:14px 18px;background:var(--sf2);border-bottom:1px solid var(--bd);cursor:pointer;user-select:none;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.model-head:hover{background:rgba(30,34,45,.8)}
+.model-body{display:none;padding:12px}.model-body.open{display:block}
+.arrow{font-size:11px;color:var(--txm);transition:transform .15s;display:inline-block}
+.arrow.open{transform:rotate(90deg)}
+.dtype-chip{font-family:var(--fn);font-size:11px;color:var(--cy);background:var(--cyb);padding:1px 8px;border-radius:3px;border:1px solid rgba(57,210,192,.13)}
+.cov-bar{height:6px;border-radius:3px;background:var(--sf2);overflow:hidden;display:flex;flex:1;max-width:120px}
+.cov-bar div{height:100%;transition:width .3s}
+.cov-summary{background:var(--sf);border-radius:8px;border:1px solid var(--bd);overflow:hidden;margin-top:8px}
+.cov-head{padding:10px 18px;cursor:pointer;user-select:none;display:flex;align-items:center;justify-content:space-between;background:var(--sf2);border-bottom:1px solid var(--bd)}
+.cov-body{display:none;padding:12px 18px}.cov-body.open{display:block}
+.cov-item{display:flex;align-items:center;gap:8px;padding:4px 0;font-size:12px;font-family:var(--fn)}
+.no-test-guide{padding:8px 18px;font-size:12px;color:var(--txm);background:var(--orb);border-top:1px solid rgba(210,153,34,.15);line-height:1.6}
+.layout{display:flex;height:calc(100vh - 53px)}
+.sidebar{width:250px;min-width:150px;max-width:500px;background:var(--sf);border-right:1px solid var(--bd);overflow-y:auto;padding:12px 0;font-size:12px;font-family:var(--fn);position:relative;flex-shrink:0}
+.sidebar-resize{width:4px;cursor:col-resize;background:transparent;flex-shrink:0;transition:background .15s}
+.sidebar-resize:hover,.sidebar-resize.active{background:var(--bl)}
+.sidebar-header{padding:0 12px 8px;display:flex;align-items:center;justify-content:space-between}
+.sidebar-title{font-size:11px;font-weight:700;color:var(--txm);text-transform:uppercase;letter-spacing:.05em}
+.sidebar-all{padding:6px 12px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;border-radius:4px;margin:0 6px 4px;transition:background .1s}
+.sidebar-all:hover{background:var(--sf2)}
+.sidebar-all.active{background:var(--blb);color:var(--bl)}
+.sidebar-file{padding:6px 12px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:6px;transition:background .1s;color:var(--txd);overflow:hidden;border-left:2px solid transparent}
+.sidebar-file:hover{background:var(--sf2);color:var(--tx)}
+.sidebar-file.active{background:var(--blb);color:var(--bl);border-left-color:var(--bl)}
+.sidebar-file-info{overflow:hidden;min-width:0;flex:1}
+.sidebar-file-path{font-size:10px;color:var(--txm);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sidebar-file-name{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:flex;align-items:center;gap:5px}
+.sidebar-file-ext{font-size:9px;font-weight:700;padding:1px 4px;border-radius:2px;flex-shrink:0}
+.sidebar-right{display:flex;align-items:center;gap:5px;flex-shrink:0}
+.sidebar-count{font-size:10px;color:var(--txm);background:var(--sf2);padding:1px 6px;border-radius:8px}
+.sidebar-dot{width:6px;height:6px;border-radius:50%}
+.sidebar-sep{height:1px;background:var(--bd);margin:6px 12px}
+.hamburger{display:none;padding:6px 10px;border:1px solid var(--bd);border-radius:4px;background:transparent;color:var(--tx);font-size:16px;cursor:pointer;line-height:1}
+.sidebar-close{display:none;padding:4px 8px;border:none;background:transparent;color:var(--txm);font-size:16px;cursor:pointer;position:absolute;top:8px;right:8px}
+@media(max-width:768px){
+.sidebar{position:fixed;top:53px;left:0;bottom:0;z-index:100;transform:translateX(-100%);transition:transform .2s}
+.sidebar.open{transform:translateX(0)}
+.sidebar-close{display:block}
+.hamburger{display:block}
+.sidebar-overlay{display:none;position:fixed;top:53px;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:99}
+.sidebar-overlay.open{display:block}
+}
+.main{flex:1;overflow-y:auto;padding:0}
+.card.focused{box-shadow:0 0 0 2px var(--bl);border-color:var(--bl)}
+.sidebar-progress{height:2px;border-radius:1px;background:var(--sf2);overflow:hidden;display:flex;margin-top:2px}
+.sidebar-progress div{height:100%}
+.kbd-help{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--sf);border:1px solid var(--bd);border-radius:10px;padding:16px 24px;font-size:13px;font-family:var(--fn);color:var(--txd);z-index:200;box-shadow:0 8px 32px rgba(0,0,0,.5);line-height:2;text-align:center}
+.kbd-help kbd{display:inline-block;padding:1px 6px;border-radius:3px;background:var(--sf2);border:1px solid var(--bd);color:var(--tx);font-size:11px;font-family:var(--fn);margin:0 2px}
+.progress-text{font-size:11px;font-family:var(--fn);color:var(--txd);margin-top:4px}
+.cte-card{background:var(--sf);border-radius:8px;border:1px solid var(--bd);overflow:hidden;margin-bottom:14px}
+.cte-head{padding:12px 18px;background:var(--sf2);border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none}
+.cte-body{padding:0;font-family:var(--fn);font-size:12px}
+</style></head><body>
+<div class="header">
+  <h1><button class="hamburger" id="hamburger-btn" onclick="toggleSidebar()">&#9776;</button><span class="icon">T</span> dbt Test Reviewer</h1>
+  <div style="display:flex;align-items:center;gap:10px">
+    <div style="font-size:12px;color:var(--txd)" id="status-indicator"></div>
+    <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" title="Toggle light/dark theme">&#9790;</button>
+  </div>
+</div>
+<div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar()"></div>
+<div class="layout">
+  <div class="sidebar" id="sidebar"></div>
+  <div class="sidebar-resize" id="sidebar-resize"></div>
+  <div class="main" id="app"></div>
+</div>
+<div id="kbd-help" class="kbd-help" style="display:none">
+<kbd>j</kbd> / <kbd>k</kbd> Navigate cards<br>
+<kbd>1</kbd> OK &middot; <kbd>2</kbd> Needs Change &middot; <kbd>3</kbd> Pending<br>
+<kbd>?</kbd> or <kbd>/</kbd> Toggle this help
+</div>
+<script>
+const POLL_INTERVAL = 2000;
+let DATA = {"allTests":[{"type":"unit","name":"test_order_total_calculation","model":"fct_orders","description":"Verify that order total = qty * unit_price with discount applied","sourceFile":"models/marts/unit_tests.yml","given":[{"input":"ref('stg_orders')","rows":[{"order_id":1,"customer_id":101,"qty":3,"unit_price":29.99,"discount":0.1,"status":"shipped"},{"order_id":2,"customer_id":102,"qty":1,"unit_price":99,"discount":null,"status":"pending"},{"order_id":3,"customer_id":101,"qty":2,"unit_price":15.5,"discount":0,"status":"returned"}]}],"expect":[{"order_id":1,"total":80.97},{"order_id":2,"total":99},{"order_id":3,"total":31}],"branchAnalysis":[{"type":"case_when","condition":"status = 'returned'","columns":["status"],"covered":true,"coverageNote":"possibly covered"},{"type":"case_when","condition":"status = 'pending'","columns":["status"],"covered":true,"coverageNote":"possibly covered"},{"type":"case_when","condition":"discount IS NULL","columns":["discount"],"covered":true,"coverageNote":"possibly covered"},{"type":"case_else","condition":"ELSE","columns":[],"covered":false,"coverageNote":"ELSE reachability not analysed"},{"type":"coalesce","condition":"discount IS NULL","columns":["discount"],"covered":true,"coverageNote":"possibly covered"}]},{"type":"schema","name":"unique","model":"fct_orders","column":"order_id","description":"Surrogate key","data_type":"integer","config":{},"sourceFile":"models/marts/schema.yml"},{"type":"schema","name":"not_null","model":"fct_orders","column":"order_id","description":"Surrogate key","data_type":"integer","config":{},"sourceFile":"models/marts/schema.yml"},{"type":"schema","name":"not_null","model":"fct_orders","column":"customer_id","description":"FK to dim_customers","data_type":"integer","config":{},"sourceFile":"models/marts/schema.yml"},{"type":"schema","name":"relationships","model":"fct_orders","column":"customer_id","description":"FK to dim_customers","data_type":"integer","config":{"to":"ref('dim_customers')","field":"customer_id"},"sourceFile":"models/marts/schema.yml"},{"type":"schema","name":"not_null","model":"fct_orders","column":"order_date","description":"Date the order was placed","data_type":"date","config":{},"sourceFile":"models/marts/schema.yml"},{"type":"schema","name":"accepted_values","model":"fct_orders","column":"status","description":"Order fulfillment status","data_type":"varchar","config":{"values":["pending","shipped","delivered","returned","cancelled"]},"sourceFile":"models/marts/schema.yml"},{"type":"schema","name":"not_null","model":"fct_orders","column":"total","description":"Calculated order total","data_type":"numeric","config":{},"sourceFile":"models/marts/schema.yml"},{"type":"schema","name":"dbt_utils.accepted_range","model":"fct_orders","column":"total","description":"Calculated order total","data_type":"numeric","config":{"min_value":0,"inclusive":true},"sourceFile":"models/marts/schema.yml"},{"type":"schema","name":"dbt_utils.unique_combination_of_columns","model":"fct_orders","column":"(model-level)","description":"","data_type":null,"config":{"combination_of_columns":["order_id","order_date"]},"sourceFile":"models/marts/schema.yml"},{"type":"schema","name":"unique","model":"dim_customers","column":"customer_id","description":"Primary key","data_type":"integer","config":{},"sourceFile":"models/marts/schema.yml"},{"type":"schema","name":"not_null","model":"dim_customers","column":"customer_id","description":"Primary key","data_type":"integer","config":{},"sourceFile":"models/marts/schema.yml"},{"type":"schema","name":"not_null","model":"dim_customers","column":"customer_name","description":"Full name","data_type":"varchar","config":{},"sourceFile":"models/marts/schema.yml"},{"type":"schema","name":"not_null","model":"dim_customers","column":"email","description":"Contact email","data_type":"varchar","config":{},"sourceFile":"models/marts/schema.yml"},{"type":"schema","name":"unique","model":"dim_customers","column":"email","description":"Contact email","data_type":"varchar","config":{},"sourceFile":"models/marts/schema.yml"},{"type":"data","name":"assert_no_orphan_orders","description":"All orders must have a valid customer","sourceFile":"tests/assert_no_orphan_orders.sql","model":"fct_orders","sql":"-- name: assert_no_orphan_orders\n-- description: All orders must have a valid customer\n\nWITH orders AS (\n    SELECT * FROM {{ ref('fct_orders') }}\n),\ncustomers AS (\n    SELECT * FROM {{ ref('dim_customers') }}\n)\n\nSELECT o.order_id\nFROM orders o\nLEFT JOIN customers c ON o.customer_id = c.customer_id\nWHERE c.customer_id IS NULL","inputs":["fct_orders","dim_customers"]}],"coverageData":[{"model":"fct_orders","total":7,"tested":5,"excluded":1,"untested":1,"coveragePercent":86,"columns":[{"name":"order_id","description":"Surrogate key","data_type":"integer","status":"tested","excludeReason":"","testCount":2},{"name":"customer_id","description":"FK to dim_customers","data_type":"integer","status":"tested","excludeReason":"","testCount":2},{"name":"order_date","description":"Date the order was placed","data_type":"date","status":"tested","excludeReason":"","testCount":1},{"name":"status","description":"Order fulfillment status","data_type":"varchar","status":"tested","excludeReason":"","testCount":1},{"name":"total","description":"Calculated order total","data_type":"numeric","status":"tested","excludeReason":"","testCount":2},{"name":"discount","description":"Applied discount rate","data_type":"numeric","status":"untested","excludeReason":"","testCount":0},{"name":"internal_memo","description":"Internal processing note","data_type":"varchar","status":"excluded","excludeReason":"Internal field, not exposed in semantic layer","testCount":0}]},{"model":"dim_customers","total":4,"tested":3,"excluded":0,"untested":1,"coveragePercent":75,"columns":[{"name":"customer_id","description":"Primary key","data_type":"integer","status":"tested","excludeReason":"","testCount":2},{"name":"customer_name","description":"Full name","data_type":"varchar","status":"tested","excludeReason":"","testCount":1},{"name":"email","description":"Contact email","data_type":"varchar","status":"tested","excludeReason":"","testCount":2},{"name":"signup_date","description":"Registration date","data_type":"date","status":"untested","excludeReason":"","testCount":0}]}],"semanticModels":[{"name":"orders_semantic","modelRef":"fct_orders","measures":[{"name":"total_revenue","agg":"sum","expr":"total","exprExplicit":true,"description":"Total revenue"},{"name":"order_count","agg":"count","expr":"order_id","exprExplicit":true,"description":"Number of orders"},{"name":"avg_discount","agg":"average","expr":"discount","exprExplicit":true,"description":"Average discount rate"}],"dimensions":[{"name":"order_date","type":"time","expr":"order_date","exprExplicit":true,"description":""},{"name":"status","type":"categorical","expr":"status","exprExplicit":true,"description":""}],"entities":[{"name":"order","type":"primary","expr":"order_id"},{"name":"customer","type":"foreign","expr":"customer_id"}]}],"metrics":[{"name":"total_revenue","label":"Total Revenue","description":"Total order revenue","type":"simple","measure":"total_revenue","expr":null,"metrics":[],"filter":null},{"name":"avg_order_value","label":"Avg Order Value","description":"Average value per order","type":"derived","measure":null,"expr":"total_revenue / order_count","metrics":["total_revenue","order_count"],"filter":null}],"semanticWarnings":[{"semanticModel":"orders_semantic","model":"fct_orders","kind":"measure","item":"avg_discount","column":"discount","detail":"agg: average","issue":"no_tests","hint":"measure \"avg_discount\" (agg: average) references column \"discount\" which has no tests"}],"fileContents":{"models/marts/unit_tests.yml":"unit_tests:\n  - name: test_order_total_calculation\n    model: fct_orders\n    description: \"Verify that order total = qty * unit_price with discount applied\"\n    given:\n      - input: ref('stg_orders')\n        rows:\n          - {order_id: 1, customer_id: 101, qty: 3, unit_price: 29.99, discount: 0.1, status: shipped}\n          - {order_id: 2, customer_id: 102, qty: 1, unit_price: 99.00, discount: null, status: pending}\n          - {order_id: 3, customer_id: 101, qty: 2, unit_price: 15.50, discount: 0.0, status: returned}\n    expect:\n      rows:\n        - {order_id: 1, total: 80.97}\n        - {order_id: 2, total: 99.00}\n        - {order_id: 3, total: 31.00}\n","models/marts/schema.yml":"models:\n  - name: fct_orders\n    description: \"Fact table for orders\"\n    columns:\n      - name: order_id\n        description: \"Surrogate key\"\n        data_type: integer\n        tests:\n          - unique\n          - not_null\n      - name: customer_id\n        description: \"FK to dim_customers\"\n        data_type: integer\n        tests:\n          - not_null\n          - relationships:\n              to: ref('dim_customers')\n              field: customer_id\n      - name: order_date\n        description: \"Date the order was placed\"\n        data_type: date\n        tests:\n          - not_null\n      - name: status\n        description: \"Order fulfillment status\"\n        data_type: varchar\n        tests:\n          - accepted_values:\n              values: [pending, shipped, delivered, returned, cancelled]\n      - name: total\n        description: \"Calculated order total\"\n        data_type: numeric\n        tests:\n          - not_null\n          - dbt_utils.accepted_range:\n              min_value: 0\n              inclusive: true\n      - name: discount\n        description: \"Applied discount rate\"\n        data_type: numeric\n      - name: internal_memo\n        description: \"Internal processing note\"\n        data_type: varchar\n        meta:\n          no_test: true\n          reason: \"Internal field, not exposed in semantic layer\"\n    tests:\n      - dbt_utils.unique_combination_of_columns:\n          combination_of_columns: [order_id, order_date]\n\n  - name: dim_customers\n    description: \"Customer dimension\"\n    columns:\n      - name: customer_id\n        description: \"Primary key\"\n        data_type: integer\n        tests:\n          - unique\n          - not_null\n      - name: customer_name\n        description: \"Full name\"\n        data_type: varchar\n        tests:\n          - not_null\n      - name: email\n        description: \"Contact email\"\n        data_type: varchar\n        tests:\n          - not_null\n          - unique\n      - name: signup_date\n        description: \"Registration date\"\n        data_type: date\n","tests/assert_no_orphan_orders.sql":"-- name: assert_no_orphan_orders\n-- description: All orders must have a valid customer\n\nWITH orders AS (\n    SELECT * FROM {{ ref('fct_orders') }}\n),\ncustomers AS (\n    SELECT * FROM {{ ref('dim_customers') }}\n)\n\nSELECT o.order_id\nFROM orders o\nLEFT JOIN customers c ON o.customer_id = c.customer_id\nWHERE c.customer_id IS NULL"},"fileCount":5,"columnMeta":{},"demoMode":true};
+let reviews = {}, comments = {}, filter = 'all', openSections = {}, selectedFile = null;
+
+function reviewKey(t) {
+  if (t.type === 'schema' && t.column !== '(model-level)') return 'col:' + t.model + ':' + t.column;
+  return t.type + ':' + t.name + ':' + (t.model || '');
+}
+
+function getFileList(tests) {
+  const fileMap = {};
+  tests.forEach(t => {
+    if (!t.sourceFile) return;
+    if (!fileMap[t.sourceFile]) fileMap[t.sourceFile] = [];
+    fileMap[t.sourceFile].push(t);
+  });
+  return Object.entries(fileMap)
+    .map(([path, tests]) => {
+      const parts = path.split('/');
+      const name = parts.pop();
+      const dir = parts.join('/');
+      return { path, name, dir, tests };
+    })
+    .sort((a, b) => a.path.localeCompare(b.path));
+}
+
+function getFileReviewStatus(tests) {
+  if (!tests || !tests.length) return null;
+  const statuses = new Set();
+  tests.forEach(t => {
+    const k = reviewKey(t);
+    statuses.add(reviews[k] || 'pending');
+  });
+  if (statuses.has('needs_change')) return 'needs_change';
+  if (statuses.has('pending')) return 'pending';
+  return 'approved';
+}
+
+function renderSidebar() {
+  const tests = DATA.allTests;
+  const files = getFileList(tests);
+  const totalTests = tests.length;
+  let h = '<div style="position:relative">';
+  h += '<button class="sidebar-close" onclick="toggleSidebar()">\u2715</button>';
+  h += '<div class="sidebar-header"><span class="sidebar-title">Files</span></div>';
+  h += '<div class="sidebar-all' + (!selectedFile ? ' active' : '') + '" onclick="selectFile(null)">';
+  h += '<span>All Files</span>';
+  h += '<span class="sidebar-count">' + totalTests + '</span>';
+  h += '</div>';
+  h += '<div class="sidebar-sep"></div>';
+  for (const file of files) {
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    const extLabel = ext === 'yml' || ext === 'yaml' ? 'Y' : ext === 'sql' ? 'S' : '?';
+    const extColor = ext === 'sql' ? 'var(--or)' : 'var(--pu)';
+    const extBg = ext === 'sql' ? 'var(--orb)' : 'var(--pub)';
+    const count = file.tests.length;
+    const status = getFileReviewStatus(file.tests);
+    const isActive = selectedFile === file.path;
+    const dotColor = status === 'approved' ? 'var(--ac)' : status === 'needs_change' ? 'var(--rd)' : status === 'pending' ? 'var(--or)' : '';
+    h += '<div class="sidebar-file' + (isActive ? ' active' : '') + '" onclick="selectFile(' + jsStr(file.path) + ')">';
+    h += '<div class="sidebar-file-info">';
+    if (file.dir) h += '<div class="sidebar-file-path">' + esc(file.dir) + '</div>';
+    h += '<div class="sidebar-file-name">';
+    h += '<span class="sidebar-file-ext" style="color:' + extColor + ';background:' + extBg + '">' + extLabel + '</span>';
+    h += esc(file.name);
+    h += '</div></div>';
+    h += '<div class="sidebar-right">';
+    if (dotColor) h += '<span class="sidebar-dot" style="background:' + dotColor + '"></span>';
+    h += '<span class="sidebar-count">' + count + '</span>';
+    h += '</div></div>';
+    // Per-file progress bar
+    const fileKeys = new Set();
+    file.tests.forEach(t => fileKeys.add(reviewKey(t)));
+    let fApproved = 0, fNeedsChange = 0;
+    fileKeys.forEach(k => {
+      if (reviews[k] === 'approved') fApproved++;
+      else if (reviews[k] === 'needs_change') fNeedsChange++;
+    });
+    const fTotal = fileKeys.size;
+    if (fTotal > 0 && (fApproved > 0 || fNeedsChange > 0)) {
+      h += '<div class="sidebar-progress" style="margin:0 12px">';
+      h += '<div style="width:' + (fApproved / fTotal * 100) + '%;background:var(--ac)"></div>';
+      h += '<div style="width:' + (fNeedsChange / fTotal * 100) + '%;background:var(--rd)"></div>';
+      h += '</div>';
+    }
+  }
+  h += '</div>';
+  document.getElementById('sidebar').innerHTML = h;
+}
+
+window.selectFile = function(path) {
+  selectedFile = path;
+  render();
+  renderSidebar();
+};
+
+window.toggleSidebar = function() {
+  const sb = document.getElementById('sidebar');
+  const ov = document.getElementById('sidebar-overlay');
+  sb.classList.toggle('open');
+  ov.classList.toggle('open');
+};
+
+// Sidebar resize drag
+(function() {
+  const handle = document.getElementById('sidebar-resize');
+  const sidebar = document.getElementById('sidebar');
+  if (!handle || !sidebar) return;
+  let dragging = false;
+  handle.addEventListener('mousedown', function(e) {
+    e.preventDefault();
+    dragging = true;
+    handle.classList.add('active');
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  });
+  document.addEventListener('mousemove', function(e) {
+    if (!dragging) return;
+    const w = Math.min(500, Math.max(150, e.clientX));
+    sidebar.style.width = w + 'px';
+  });
+  document.addEventListener('mouseup', function() {
+    if (!dragging) return;
+    dragging = false;
+    handle.classList.remove('active');
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+  });
+})();
+
+// Theme: system default, persisted to localStorage
+(function() {
+  const saved = localStorage.getItem('dbt-reviewer-theme');
+  if (saved === 'light') document.documentElement.classList.add('light');
+  else if (saved === 'dark') document.documentElement.classList.remove('light');
+  else if (window.matchMedia('(prefers-color-scheme: light)').matches) document.documentElement.classList.add('light');
+})();
+
+window.toggleTheme = function() {
+  const isLight = document.documentElement.classList.toggle('light');
+  localStorage.setItem('dbt-reviewer-theme', isLight ? 'light' : 'dark');
+  const btn = document.getElementById('theme-toggle');
+  if (btn) btn.textContent = isLight ? '\u2600' : '\u263E';
+};
+
+function init() {
+  // Set theme button icon
+  const isLight = document.documentElement.classList.contains('light');
+  const btn = document.getElementById('theme-toggle');
+  if (btn) btn.textContent = isLight ? '\u2600' : '\u263E';
+  const si = document.getElementById('status-indicator');
+  if (DATA.demoMode) {
+    si.innerHTML = '<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;background:rgba(188,140,255,.15);color:#bc8cff;margin-right:4px">DEMO</span>Demo \u2014 Sample dbt project';
+  } else {
+    si.innerHTML = '<span class="live-dot"></span>Live \u2014 Auto-refreshes on file changes';
+  }
+  DATA.allTests.forEach(t => {
+    const k = reviewKey(t);
+    if (!reviews[k]) { reviews[k] = 'pending'; comments[k] = ''; }
+  });
+  if (DATA.coverageData) {
+    DATA.coverageData.forEach(cov => {
+      cov.columns.filter(c => c.status === 'untested').forEach(c => {
+        const k = 'col:' + cov.model + ':' + c.name;
+        if (!reviews[k]) { reviews[k] = 'pending'; comments[k] = ''; }
+      });
+    });
+  }
+  if (DATA.semanticModels) {
+    DATA.semanticModels.forEach(sm => {
+      const k = 'semantic:' + sm.name + ':' + sm.modelRef;
+      if (!reviews[k]) { reviews[k] = 'pending'; comments[k] = ''; }
+    });
+  }
+  render(); renderSidebar(); poll();
+}
+
+async function poll() {
+  if (DATA.demoMode) return;
+  try {
+    const r = await fetch('/api/data');
+    const d = await r.json();
+    if (JSON.stringify(d.allTests) !== JSON.stringify(DATA.allTests)) {
+      DATA = d;
+      d.allTests.forEach(t => {
+        const k = reviewKey(t);
+        if (!reviews[k]) { reviews[k] = 'pending'; comments[k] = ''; }
+      });
+      if (DATA.coverageData) {
+        DATA.coverageData.forEach(cov => {
+          cov.columns.filter(c => c.status === 'untested').forEach(c => {
+            const k = 'col:' + cov.model + ':' + c.name;
+            if (!reviews[k]) { reviews[k] = 'pending'; comments[k] = ''; }
+          });
+        });
+      }
+      if (DATA.semanticModels) {
+        DATA.semanticModels.forEach(sm => {
+          const k = 'semantic:' + sm.name + ':' + sm.modelRef;
+          if (!reviews[k]) { reviews[k] = 'pending'; comments[k] = ''; }
+        });
+      }
+      render(); renderSidebar();
+    }
+  } catch {}
+  setTimeout(poll, POLL_INTERVAL);
+}
+
+// --- CTE DAG Graph ---
+function layoutCTEGraph(parsed) {
+  var ctes = parsed.ctes, finalSelect = parsed.finalSelect, finalDeps = parsed.finalDeps;
+  if (!ctes.length) return { nodes: [], edges: [], layerCount: 0 };
+  var allExt = new Set();
+  for (var i = 0; i < ctes.length; i++) (ctes[i].externalRefs || []).forEach(function(r) { allExt.add(r); });
+  var nodes = [], nodeMap = {};
+  allExt.forEach(function(r) {
+    var id = 'ref:' + r;
+    var n = { id: id, label: r, type: 'source', layer: 0, col: 0, colCount: 1, body: null };
+    nodes.push(n); nodeMap[id] = n;
+  });
+  for (var i = 0; i < ctes.length; i++) {
+    var c = ctes[i];
+    var id = 'cte:' + c.name.toLowerCase();
+    var n = { id: id, label: c.name, type: 'cte', layer: -1, col: 0, colCount: 1, body: c.body, deps: c.deps || [], externalRefs: c.externalRefs || [] };
+    nodes.push(n); nodeMap[id] = n;
+  }
+  var finalNode = { id: 'final', label: 'SELECT', type: 'final', layer: -1, col: 0, colCount: 1, body: finalSelect, deps: finalDeps || [] };
+  nodes.push(finalNode); nodeMap['final'] = finalNode;
+  function asgn(nid, vis) {
+    vis = vis || new Set();
+    var n = nodeMap[nid]; if (!n || n.layer >= 0) return n ? n.layer : 0;
+    if (vis.has(nid)) return 0; vis.add(nid);
+    var mx = 0;
+    if (n.type === 'cte') {
+      for (var j = 0; j < n.deps.length; j++) mx = Math.max(mx, asgn('cte:' + n.deps[j], vis) + 1);
+      if (n.externalRefs && n.externalRefs.length) mx = Math.max(mx, 1);
+    }
+    if (n.type === 'final') { for (var j = 0; j < n.deps.length; j++) mx = Math.max(mx, asgn('cte:' + n.deps[j], vis) + 1); }
+    n.layer = n.type === 'source' ? 0 : mx;
+    return n.layer;
+  }
+  for (var i = 0; i < nodes.length; i++) asgn(nodes[i].id);
+  var maxL = 0;
+  for (var i = 0; i < nodes.length; i++) { if (nodes[i].type !== 'final' && nodes[i].layer > maxL) maxL = nodes[i].layer; }
+  finalNode.layer = maxL + 1;
+  var edges = [];
+  for (var i = 0; i < ctes.length; i++) {
+    var c = ctes[i];
+    for (var j = 0; j < (c.deps || []).length; j++) edges.push({ from: 'cte:' + c.deps[j], to: 'cte:' + c.name.toLowerCase() });
+    for (var j = 0; j < (c.externalRefs || []).length; j++) edges.push({ from: 'ref:' + c.externalRefs[j], to: 'cte:' + c.name.toLowerCase() });
+  }
+  for (var j = 0; j < (finalDeps || []).length; j++) edges.push({ from: 'cte:' + finalDeps[j], to: 'final' });
+  var layers = {};
+  for (var i = 0; i < nodes.length; i++) { var ly = nodes[i].layer; if (!layers[ly]) layers[ly] = []; layers[ly].push(nodes[i]); }
+  for (var ly in layers) layers[ly].forEach(function(n, idx) { n.col = idx; n.colCount = layers[ly].length; });
+  return { nodes: nodes, edges: edges, layerCount: finalNode.layer + 1 };
+}
+
+function renderCTEGraph(parsed) {
+  var layout = layoutCTEGraph(parsed);
+  var nodes = layout.nodes, edges = layout.edges, layerCount = layout.layerCount;
+  if (!nodes.length) return '<div style="padding:24px;color:var(--txm);text-align:center">No CTEs detected</div>';
+  var NODE_W = 160, NODE_H = 40, LAYER_GAP = 80, COL_GAP = 40;
+  var maxCols = 1;
+  for (var i = 0; i < nodes.length; i++) { if (nodes[i].colCount > maxCols) maxCols = nodes[i].colCount; }
+  var svgW = Math.max(600, maxCols * (NODE_W + COL_GAP) + COL_GAP);
+  var svgH = layerCount * (NODE_H + LAYER_GAP) + LAYER_GAP;
+  function getPos(n) {
+    var lw = n.colCount * (NODE_W + COL_GAP) - COL_GAP;
+    return { x: (svgW - lw) / 2 + n.col * (NODE_W + COL_GAP), y: LAYER_GAP / 2 + n.layer * (NODE_H + LAYER_GAP) };
+  }
+  var nc = {
+    source: { fill: 'var(--blb)', stroke: 'var(--bl)', text: 'var(--bl)' },
+    cte: { fill: 'var(--cyb)', stroke: 'var(--cy)', text: 'var(--cy)' },
+    final: { fill: 'var(--acb)', stroke: 'var(--ac)', text: 'var(--ac)' }
+  };
+  var h = '<div style="display:flex;gap:16px;padding:12px 18px;flex-wrap:wrap;justify-content:center">';
+  [['ref/source', 'var(--bl)'], ['CTE', 'var(--cy)'], ['Final SELECT', 'var(--ac)']].forEach(function(p) {
+    h += '<div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--txd)">';
+    h += '<div style="width:12px;height:12px;border-radius:3px;background:' + p[1] + '22;border:2px solid ' + p[1] + '"></div>' + p[0] + '</div>';
+  });
+  h += '</div>';
+  h += '<div style="overflow-x:auto;border-radius:8px;border:1px solid var(--bd);background:var(--bg);margin:0 12px">';
+  h += '<svg width="' + svgW + '" height="' + svgH + '" style="display:block">';
+  h += '<defs><marker id="cte-arr" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 3.5L0 7z" fill="var(--txm)"/></marker></defs>';
+  for (var ei = 0; ei < edges.length; ei++) {
+    var e = edges[ei], f = null, t = null;
+    for (var ni = 0; ni < nodes.length; ni++) { if (nodes[ni].id === e.from) f = nodes[ni]; if (nodes[ni].id === e.to) t = nodes[ni]; }
+    if (!f || !t) continue;
+    var fp = getPos(f), tp = getPos(t);
+    var x1 = fp.x + NODE_W / 2, y1 = fp.y + NODE_H, x2 = tp.x + NODE_W / 2, y2 = tp.y;
+    h += '<path d="M' + x1 + ',' + y1 + ' C' + x1 + ',' + (y1 + (y2-y1)*.4) + ' ' + x2 + ',' + (y2 - (y2-y1)*.4) + ' ' + x2 + ',' + y2 + '" fill="none" stroke="var(--txm)" stroke-opacity="0.35" stroke-width="1.2" marker-end="url(#cte-arr)"/>';
+  }
+  for (var ni = 0; ni < nodes.length; ni++) {
+    var n = nodes[ni], p = getPos(n), c = nc[n.type];
+    var label = n.label.length > 18 ? n.label.slice(0, 16) + '\u2026' : n.label;
+    h += '<g style="cursor:pointer" onclick="selectCTENode(\'' + n.id.replace(/'/g, "\\'") + '\')">';
+    h += '<rect x="' + p.x + '" y="' + p.y + '" width="' + NODE_W + '" height="' + NODE_H + '" rx="8" fill="' + c.fill + '" stroke="' + c.stroke + '" stroke-width="1.5"/>';
+    h += '<text x="' + (p.x + NODE_W/2) + '" y="' + (p.y + NODE_H/2 + 1) + '" text-anchor="middle" dominant-baseline="central" fill="' + c.text + '" font-size="12" font-weight="600" font-family="var(--fn)">' + esc(label) + '</text>';
+    h += '</g>';
+  }
+  h += '</svg></div>';
+  h += '<div id="cte-detail"></div>';
+  return h;
+}
+
+window.selectCTENode = function(nodeId) {
+  var cteResults = DATA.cteResults || {};
+  var detail = document.getElementById('cte-detail');
+  if (!detail) return;
+  for (var file in cteResults) {
+    var parsed = cteResults[file];
+    for (var i = 0; i < parsed.ctes.length; i++) {
+      var c = parsed.ctes[i];
+      if ('cte:' + c.name.toLowerCase() === nodeId) {
+        detail.innerHTML = '<div style="margin:12px;background:var(--sf);border-radius:8px;border:1px solid var(--bd);overflow:hidden">' +
+          '<div style="padding:10px 16px;border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:10px;background:var(--sf2)">' +
+          '<span class="badge" style="color:var(--cy);background:var(--cyb)">CTE</span>' +
+          '<span style="font-family:var(--fn);font-size:14px;font-weight:700">' + esc(c.name) + '</span>' +
+          (c.deps && c.deps.length ? '<span style="font-size:11px;color:var(--txm)">\u2190 ' + c.deps.join(', ') + '</span>' : '') +
+          '</div><pre class="sql-pre">' + highlightSQL(c.body) + '</pre></div>';
+        return;
+      }
+    }
+    if (nodeId === 'final') {
+      detail.innerHTML = '<div style="margin:12px;background:var(--sf);border-radius:8px;border:1px solid var(--bd);overflow:hidden">' +
+        '<div style="padding:10px 16px;border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:10px;background:var(--sf2)">' +
+        '<span class="badge" style="color:var(--ac);background:var(--acb)">SELECT</span>' +
+        '<span style="font-family:var(--fn);font-size:14px;font-weight:700">Final SELECT</span>' +
+        (parsed.finalDeps && parsed.finalDeps.length ? '<span style="font-size:11px;color:var(--txm)">\u2190 ' + parsed.finalDeps.join(', ') + '</span>' : '') +
+        '</div><pre class="sql-pre">' + highlightSQL(parsed.finalSelect) + '</pre></div>';
+      return;
+    }
+    if (nodeId.startsWith('ref:')) {
+      var refName = nodeId.slice(4);
+      detail.innerHTML = '<div style="margin:12px;padding:12px 16px;background:var(--sf);border-radius:8px;border:1px solid var(--bd);font-family:var(--fn);font-size:12px;color:var(--bl)">' +
+        '<span class="badge" style="color:var(--bl);background:var(--blb);margin-right:8px">ref</span>' + esc(refName) + '</div>';
+      return;
+    }
+  }
+  detail.innerHTML = '';
+};
+
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+function highlightSQL(s) {
+  const e = String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  // BigQuery SQL keywords
+  const keywords = 'SELECT|FROM|WHERE|JOIN|LEFT|RIGHT|INNER|OUTER|FULL|CROSS|ON|AND|OR|NOT|IN|IS|NULL|AS|WITH|CASE|WHEN|THEN|ELSE|END|GROUP|BY|ORDER|HAVING|LIMIT|OFFSET|UNION|ALL|DISTINCT|INSERT|UPDATE|DELETE|INTO|VALUES|SET|CREATE|DROP|ALTER|TABLE|INDEX|EXISTS|BETWEEN|LIKE|CAST|OVER|PARTITION|TRUE|FALSE|ASC|DESC|NULLS|FIRST|LAST|RECURSIVE|EXCEPT|INTERSECT|LATERAL|UNNEST|WINDOW|ROWS|RANGE|UNBOUNDED|PRECEDING|FOLLOWING|CURRENT|ROW|QUALIFY|PIVOT|UNPIVOT|TABLESAMPLE|FOR|SYSTEM_TIME|STRUCT|ARRAY|MERGE|USING|MATCHED|DECLARE|BEGIN|LOOP|WHILE|BREAK|CONTINUE|RETURN|RAISE|ASSERT|TEMP|TEMPORARY|REPLACE|VIEW|FUNCTION|PROCEDURE|RETURNS|LANGUAGE|OPTIONS|EXPORT|DATA|INTERVAL|AT|TIME|ZONE|RESPECT|IGNORE|ANY_VALUE|IF|IIF|IFNULL|NULLIF|SAFE_CAST';
+  // BigQuery functions
+  const functions = [
+    // Aggregate
+    'COUNT|SUM|AVG|MIN|MAX|ARRAY_AGG|STRING_AGG|COUNTIF|LOGICAL_AND|LOGICAL_OR|BIT_AND|BIT_OR|BIT_XOR|APPROX_COUNT_DISTINCT|APPROX_QUANTILES|APPROX_TOP_COUNT|APPROX_TOP_SUM|ANY_VALUE|CORR|COVAR_POP|COVAR_SAMP|STDDEV|STDDEV_POP|STDDEV_SAMP|VARIANCE|VAR_POP|VAR_SAMP',
+    // Analytic / Window
+    'ROW_NUMBER|RANK|DENSE_RANK|PERCENT_RANK|CUME_DIST|NTILE|LAG|LEAD|FIRST_VALUE|LAST_VALUE|NTH_VALUE|PERCENTILE_CONT|PERCENTILE_DISC',
+    // String
+    'CONCAT|LENGTH|LOWER|UPPER|TRIM|LTRIM|RTRIM|LPAD|RPAD|SUBSTR|SUBSTRING|REPLACE|REVERSE|REPEAT|FORMAT|STARTS_WITH|ENDS_WITH|CONTAINS_SUBSTR|REGEXP_CONTAINS|REGEXP_EXTRACT|REGEXP_EXTRACT_ALL|REGEXP_REPLACE|SPLIT|BYTE_LENGTH|CHAR_LENGTH|CHARACTER_LENGTH|LEFT|RIGHT|STRPOS|SAFE_CONVERT_BYTES_TO_STRING|TO_BASE64|FROM_BASE64|TO_HEX|FROM_HEX|INITCAP|NORMALIZE|NORMALIZE_AND_CASEFOLD|TRANSLATE|UNICODE|CHR|ASCII|SOUNDEX|COLLATE',
+    // Date / Time / Timestamp
+    'DATE|DATETIME|TIME|TIMESTAMP|CURRENT_DATE|CURRENT_DATETIME|CURRENT_TIME|CURRENT_TIMESTAMP|DATE_ADD|DATE_SUB|DATE_DIFF|DATE_TRUNC|DATE_FROM_UNIX_DATE|UNIX_DATE|DATETIME_ADD|DATETIME_SUB|DATETIME_DIFF|DATETIME_TRUNC|TIME_ADD|TIME_SUB|TIME_DIFF|TIME_TRUNC|TIMESTAMP_ADD|TIMESTAMP_SUB|TIMESTAMP_DIFF|TIMESTAMP_TRUNC|TIMESTAMP_SECONDS|TIMESTAMP_MILLIS|TIMESTAMP_MICROS|UNIX_SECONDS|UNIX_MILLIS|UNIX_MICROS|EXTRACT|FORMAT_DATE|FORMAT_DATETIME|FORMAT_TIME|FORMAT_TIMESTAMP|PARSE_DATE|PARSE_DATETIME|PARSE_TIME|PARSE_TIMESTAMP|LAST_DAY',
+    // Math
+    'ABS|SIGN|ROUND|TRUNC|CEIL|CEILING|FLOOR|MOD|DIV|POW|POWER|SQRT|LOG|LOG10|LN|EXP|GREATEST|LEAST|SAFE_DIVIDE|SAFE_MULTIPLY|SAFE_NEGATE|SAFE_ADD|SAFE_SUBTRACT|IEEE_DIVIDE|RAND|RANGE_BUCKET',
+    // Conversion
+    'CAST|SAFE_CAST|PARSE_JSON|TO_JSON|TO_JSON_STRING|INT64|FLOAT64|NUMERIC|BIGNUMERIC|STRING|BYTES|BOOL',
+    // Array / Struct
+    'ARRAY_LENGTH|ARRAY_TO_STRING|ARRAY_REVERSE|ARRAY_CONCAT|GENERATE_ARRAY|GENERATE_DATE_ARRAY|GENERATE_TIMESTAMP_ARRAY|OFFSET|ORDINAL|SAFE_OFFSET|SAFE_ORDINAL|FLATTEN',
+    // Conditional
+    'COALESCE|IFNULL|NULLIF|IF|IIF',
+    // JSON
+    'JSON_EXTRACT|JSON_EXTRACT_SCALAR|JSON_EXTRACT_ARRAY|JSON_EXTRACT_STRING_ARRAY|JSON_QUERY|JSON_VALUE|JSON_QUERY_ARRAY|JSON_VALUE_ARRAY|JSON_TYPE|LAX_BOOL|LAX_FLOAT64|LAX_INT64|LAX_STRING',
+    // Hash / Geography / Other
+    'MD5|SHA1|SHA256|SHA512|FARM_FINGERPRINT|ST_GEOGPOINT|ST_DISTANCE|ST_WITHIN|ST_AREA|ST_ASTEXT|ST_GEOGFROMTEXT|ERROR|GENERATE_UUID',
+    // dbt Jinja
+    'ref|source|config|var'
+  ].join('|');
+  return e
+    .replace(/--.*$/gm, '<span class="sql-comment">$&</span>')
+    .replace(/('(?:[^'\\]|\\.)*')/g, '<span class="sql-string">$1</span>')
+    .replace(/\{\{[^}]*\}\}/g, '<span class="sql-jinja">$&</span>')
+    .replace(new RegExp('\\b(' + functions + ')\\s*\\(', 'gi'), (m, fn) => '<span class="sql-func">' + fn + '</span>(')
+    .replace(new RegExp('\\b(' + keywords + ')\\b', 'gi'), (m) => {
+      if (m.match(/^<span/)) return m; // skip already highlighted
+      return '<span class="sql-keyword">' + m.toUpperCase() + '</span>';
+    })
+    .replace(/\b(\d+(?:\.\d+)?)\b/g, '<span class="sql-number">$1</span>');
+}
+function highlightYAML(s) {
+  const e = String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return e
+    .replace(/#.*$/gm, '<span class="yaml-comment">$&</span>')
+    .replace(/^(\s*-?\s*)([a-zA-Z_][\w.]*)(\s*:)/gm, '$1<span class="yaml-key">$2</span>$3')
+    .replace(/:\s+('(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")\s*$/gm, (m, str) => m.replace(str, '<span class="yaml-str">' + str + '</span>'))
+    .replace(/\b(true|false|yes|no)\b/gi, '<span class="yaml-bool">$&</span>')
+    .replace(/\bnull\b/gi, '<span class="yaml-null">$&</span>')
+    .replace(/:\s+(\d+(?:\.\d+)?)\s*$/gm, (m, n) => m.replace(n, '<span class="yaml-num">' + n + '</span>'));
+}
+function jsStr(s) { return JSON.stringify(String(s)).replace(/"/g, '&quot;'); }
+
+function cardBorderStyle(key) {
+  const s = reviews[key];
+  if (s === 'approved') return 'border-left:3px solid var(--ac);';
+  if (s === 'needs_change') return 'border-left:3px solid var(--rd);';
+  return '';
+}
+
+function renderValue(v) {
+  if (v === null || v === undefined) return '<span class="v-null">null</span>';
+  if (v === true) return '<span class="v-true">true</span>';
+  if (v === false) return '<span class="v-false">false</span>';
+  if (typeof v === 'number') return '<span class="v-num">' + v + '</span>';
+  return '<span class="v-str">' + esc(v) + '</span>';
+}
+
+function renderTable(rows, accent, label) {
+  if (!rows?.length) return '<div style="padding:12px;color:var(--txm);font-style:italic">No data</div>';
+  const cols = [...new Set(rows.flatMap(r => r && typeof r === 'object' ? Object.keys(r) : []))];
+  if (!cols.length) return '';
+  let h = '';
+  if (label) h += '<div class="tbl-label" style="color:' + accent + '">' + esc(label) + '</div>';
+  h += '<table><thead><tr><th style="text-align:center;width:36px">#</th>';
+  cols.forEach(c => h += '<th>' + esc(c) + '</th>');
+  h += '</tr></thead><tbody>';
+  rows.forEach((r, i) => {
+    h += '<tr>';
+    h += '<td style="text-align:center;color:var(--txm);font-size:11px">' + (i + 1) + '</td>';
+    cols.forEach(c => h += '<td>' + renderValue(r?.[c]) + '</td>');
+    h += '</tr>';
+  });
+  h += '</tbody></table>';
+  return h;
+}
+
+function renderReviewBtns(key) {
+  const btns = [
+    ['approved', '\u2713 OK', '--ac', '--acb'],
+    ['needs_change', '\u2717 Needs Change', '--rd', '--rdb'],
+    ['pending', '\u2014 Pending', '--or', '--orb'],
+  ];
+  const jKey = jsStr(key);
+  return '<div class="review-btns" onclick="event.stopPropagation()">' + btns.map(([s, label, c, bg]) => {
+    const active = reviews[key] === s;
+    const style = active
+      ? 'color:var(' + c + ');background:var(' + bg + ');border-color:var(' + c + ');font-weight:700'
+      : '';
+    return '<button style="' + style + '" onclick="setReview(' + jKey + ',\'' + s + '\')">' + label + '</button>';
+  }).join('') + '</div>';
+}
+
+function renderComment(key) {
+  const jKey = jsStr(key);
+  return '<div style="padding:0 18px 12px"><textarea class="comment-box" placeholder="Review comment..." onclick="event.stopPropagation()" oninput="setComment(' + jKey + ',this.value)">' + esc(comments[key] || '') + '</textarea></div>';
+}
+
+function renderConfig(config) {
+  if (!config || typeof config !== 'object' || !Object.keys(config).length) return '';
+  let h = '<div style="padding:10px 18px;border-top:1px solid var(--bd);display:flex;flex-direction:column;gap:6px">';
+  for (const [k, v] of Object.entries(config)) {
+    if (Array.isArray(v)) {
+      h += '<div style="display:flex;flex-wrap:wrap;gap:5px;align-items:center">';
+      h += '<span class="config-key">' + esc(k) + ':</span>';
+      v.forEach(item => h += '<span class="config-chip">' + esc(item) + '</span>');
+      h += '</div>';
+    } else {
+      const isExpr = /expression|condition|where/i.test(k);
+      h += '<div class="config-row"><span class="config-key">' + esc(k) + ':</span>';
+      if (isExpr) h += '<code class="config-expr">' + esc(v) + '</code>';
+      else if (typeof v === 'number') h += '<span style="font-size:12px;font-family:var(--fn);color:var(--or)">' + v + '</span>';
+      else if (typeof v === 'boolean') h += '<span style="font-size:12px;font-family:var(--fn);color:var(' + (v ? '--ac' : '--rd') + ')">' + v + '</span>';
+      else h += '<span class="config-val">' + esc(typeof v === 'object' ? JSON.stringify(v) : v) + '</span>';
+      h += '</div>';
+    }
+  }
+  h += '</div>';
+  return h;
+}
+
+function groupByModel(tests) {
+  const models = {};
+  for (const t of tests) {
+    const m = t.model || '(other)';
+    if (!models[m]) models[m] = { unit: [], schema: [], data: [], modelLevel: [] };
+    if (t.type === 'schema' && t.column === '(model-level)') models[m].modelLevel.push(t);
+    else if (t.type === 'schema') models[m].schema.push(t);
+    else models[m][t.type].push(t);
+  }
+  return models;
+}
+
+function groupSchemaByColumn(schemaTests) {
+  const cols = {};
+  for (const t of schemaTests) {
+    const c = t.column || '?';
+    if (!cols[c]) cols[c] = { tests: [], description: t.description || '', data_type: t.data_type || null };
+    cols[c].tests.push(t);
+    if (t.description && !cols[c].description) cols[c].description = t.description;
+    if (t.data_type && !cols[c].data_type) cols[c].data_type = t.data_type;
+  }
+  return cols;
+}
+
+function matchFilter(key, type) {
+  if (filter === 'all') return true;
+  if (['unit', 'data', 'semantic'].includes(filter)) return type === filter;
+  if (filter === 'schema') return type === 'schema';
+  return reviews[key] === filter;
+}
+
+function render() {
+  const tests = selectedFile ? DATA.allTests.filter(t => t.sourceFile === selectedFile) : DATA.allTests;
+  const coverage = DATA.coverageData || [];
+  // Stats always computed from ALL tests (for global filter buttons)
+  const globalKeys = [...new Set(DATA.allTests.map(reviewKey))];
+  const semanticKeys = (DATA.semanticModels || []).map(sm => 'semantic:' + sm.name + ':' + sm.modelRef);
+  const stats = { total: globalKeys.length + semanticKeys.length, unit: 0, schema: 0, data: 0, semantic: semanticKeys.length, approved: 0, needs_change: 0, pending: 0 };
+  const seen = new Set();
+  DATA.allTests.forEach(t => {
+    const k = reviewKey(t);
+    if (!seen.has(k)) {
+      seen.add(k);
+      if (t.type === 'schema' && t.column !== '(model-level)') stats.schema++;
+      else stats[t.type]++;
+      stats[reviews[k] || 'pending']++;
+    }
+  });
+  semanticKeys.forEach(k => { stats[reviews[k] || 'pending']++; });
+
+  let h = '';
+  h += '<div style="position:sticky;top:0;z-index:10;background:var(--bg);padding:16px 16px 0;border-bottom:1px solid var(--bd);box-shadow:0 -20px 0 20px var(--bg)">';
+  h += '<div style="margin-bottom:10px;font-size:12px;color:var(--txd)">';
+  if (selectedFile) {
+    h += '<span style="color:var(--bl);cursor:pointer" onclick="selectFile(null)">\u2190 All Files</span> / ';
+    h += '<span style="color:var(--tx)">' + esc(selectedFile) + '</span>';
+    h += ' \u2014 ' + tests.length + ' tests';
+  } else {
+    h += DATA.fileCount + ' files / ' + tests.length + ' tests / ' + stats.total + ' review items (Unit: ' + stats.unit + ', Column: ' + stats.schema + ', Data: ' + stats.data + (stats.semantic ? ', Semantic: ' + stats.semantic : '') + ')';
+  }
+  h += '</div>';
+
+  // Type filters
+  h += '<div class="filters" style="margin-bottom:6px">';
+  const typeDefs = [
+    ['all', 'All (' + stats.total + ')', '--tx'],
+    stats.unit > 0 && ['unit', 'Unit (' + stats.unit + ')', '--bl'],
+    stats.schema > 0 && ['schema', 'Column (' + stats.schema + ')', '--pu'],
+    stats.data > 0 && ['data', 'Data (' + stats.data + ')', '--or'],
+    stats.semantic > 0 && ['semantic', 'Semantic (' + stats.semantic + ')', '--cy'],
+  ].filter(Boolean);
+  typeDefs.forEach(([k, label, c]) => {
+    const active = filter === k;
+    const style = active ? 'color:var(--bg);background:var(' + c + ');border-color:var(' + c + ')' : '';
+    h += '<button class="' + (active ? 'active' : '') + '" style="' + style + '" onclick="setFilter(\'' + k + '\')">' + label + '</button>';
+  });
+  h += '</div>';
+  // Status filters
+  h += '<div class="filters" style="margin-bottom:10px">';
+  const statusDefs = [
+    ['pending', 'Pending (' + stats.pending + ')', '--or'],
+    ['approved', 'OK (' + stats.approved + ')', '--ac'],
+    stats.needs_change > 0 && ['needs_change', 'Needs Change (' + stats.needs_change + ')', '--rd'],
+  ].filter(Boolean);
+  statusDefs.forEach(([k, label, c]) => {
+    const active = filter === k;
+    const style = active ? 'color:var(--bg);background:var(' + c + ');border-color:var(' + c + ')' : '';
+    h += '<button class="' + (active ? 'active' : '') + '" style="' + style + '" onclick="setFilter(\'' + k + '\')">' + label + '</button>';
+  });
+  h += '</div>';
+
+  h += '<div class="progress" style="margin-bottom:0">';
+  if (stats.total) {
+    h += '<div style="width:' + (stats.approved / stats.total * 100) + '%;background:var(--ac);transition:width .3s"></div>';
+    h += '<div style="width:' + (stats.needs_change / stats.total * 100) + '%;background:var(--rd);transition:width .3s"></div>';
+  }
+  h += '</div>';
+  const reviewed = stats.approved + stats.needs_change;
+  const pct = stats.total ? Math.round(reviewed / stats.total * 100) : 0;
+  h += '<div class="progress-text">' + reviewed + '/' + stats.total + ' reviewed (' + pct + '%)</div>';
+  h += '</div>';
+  h += '<div style="padding:16px">';
+
+  const models = groupByModel(tests);
+
+  for (const [modelName, group] of Object.entries(models)) {
+    const modelId = 'model_' + modelName.replace(/[^a-zA-Z0-9]/g, '_');
+    const cov = coverage.find(c => c.model === modelName);
+    const testCount = group.unit.length + group.schema.length + group.data.length + group.modelLevel.length;
+
+    // Skip entire model group if no cards match current filter
+    if (filter !== 'all') {
+      const hasUnit = filter === 'unit' && group.unit.length > 0;
+      const hasSchema = filter === 'schema' && (group.schema.length > 0 || group.modelLevel.length > 0);
+      const hasData = filter === 'data' && group.data.length > 0;
+      const hasSemantic = filter === 'semantic' && (DATA.semanticModels || []).some(sm => sm.modelRef === modelName);
+      const hasStatus = ['approved', 'needs_change', 'pending'].includes(filter) && (
+        [...group.unit, ...group.schema, ...group.data, ...group.modelLevel].some(t => reviews[reviewKey(t)] === filter) ||
+        (DATA.semanticModels || []).filter(sm => sm.modelRef === modelName).some(sm => reviews['semantic:' + sm.name + ':' + modelName] === filter) ||
+        (cov ? cov.columns.filter(c => c.status === 'untested').some(c => reviews['col:' + modelName + ':' + c.name] === filter) : false)
+      );
+      if (!hasUnit && !hasSchema && !hasData && !hasSemantic && !hasStatus) continue;
+    }
+
+    const isOpen = openSections[modelId] !== false;
+
+    h += '<div class="model-group">';
+    h += '<div class="model-head" onclick="toggleSection(\'' + modelId + '\')">';
+    h += '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">';
+    h += '<span class="arrow ' + (isOpen ? 'open' : '') + '">\u25B6</span>';
+    h += '<span style="font-size:14px;font-weight:700;font-family:var(--fn)">' + esc(modelName) + '</span>';
+    h += '<span style="font-size:12px;color:var(--txd)">' + testCount + ' tests</span>';
+    const modelDesc = (DATA.modelDescriptions || {})[modelName];
+    if (modelDesc) h += '<span style="font-size:12px;color:var(--txm);font-weight:400">' + esc(modelDesc) + '</span>';
+    if (cov) {
+      h += '<div style="display:flex;align-items:center;gap:6px">';
+      h += '<div class="cov-bar"><div style="width:' + (cov.total ? cov.tested / cov.total * 100 : 0) + '%;background:var(--ac)"></div>';
+      h += '<div style="width:' + (cov.total ? cov.excluded / cov.total * 100 : 0) + '%;background:var(--txm)"></div></div>';
+      const covColor = cov.coveragePercent === 100 ? 'var(--ac)' : cov.untested > 0 ? 'var(--or)' : 'var(--txd)';
+      h += '<span style="font-size:11px;font-family:var(--fn);color:' + covColor + '">' + cov.coveragePercent + '%</span>';
+      h += '</div>';
+    }
+    h += '</div></div>';
+
+    h += '<div class="model-body ' + (isOpen ? 'open' : '') + '" id="' + modelId + '">';
+
+    // Source files for this model
+    const sourceFiles = [...new Set([...group.unit, ...group.schema, ...group.data, ...group.modelLevel].map(t => t.sourceFile).filter(Boolean))];
+    if (sourceFiles.length && (DATA.fileContents || {})[sourceFiles[0]]) {
+      h += '<div style="padding:8px 18px;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">';
+      sourceFiles.forEach(sf => {
+        const rawId = 'raw_model_' + modelName.replace(/[^a-zA-Z0-9]/g, '_') + '_' + sf.replace(/[^a-zA-Z0-9]/g, '_');
+        h += '<button class="raw-btn" onclick="event.stopPropagation();toggleRaw(\'' + rawId + '\')">' + esc(sf.split('/').pop()) + '</button>';
+      });
+      h += '</div>';
+      sourceFiles.forEach(sf => {
+        const rawId = 'raw_model_' + modelName.replace(/[^a-zA-Z0-9]/g, '_') + '_' + sf.replace(/[^a-zA-Z0-9]/g, '_');
+        const ext = sf.split('.').pop()?.toLowerCase();
+        const raw = (DATA.fileContents || {})[sf] || '';
+        const highlighted = (ext === 'sql') ? highlightSQL(raw) : highlightYAML(raw);
+        h += '<pre class="raw-pre" id="' + rawId + '" style="display:none">' + highlighted + '</pre>';
+      });
+    }
+
+    // Unit tests
+    for (const test of group.unit) {
+      const key = reviewKey(test);
+      if (!matchFilter(key, 'unit')) continue;
+      const cardId = 'card_' + key.replace(/[^a-zA-Z0-9]/g, '_');
+      const cardOpen = openSections[cardId] !== false;
+      h += '<div class="card" data-review-key="' + esc(key) + '" onclick="focusCard(this)" style="' + cardBorderStyle(key) + '">';
+      h += '<div class="card-head clickable with-border" onclick="toggleSection(\'' + cardId + '\')">';
+      h += '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">';
+      h += '<span class="arrow ' + (cardOpen ? 'open' : '') + '">\u25B6</span>';
+      h += '<span class="badge" style="color:var(--bl);background:var(--blb)">Unit</span>';
+      h += '<span class="card-name">' + esc(test.name) + '</span>';
+      if (test.sourceFile) h += '<span class="card-dim" style="font-family:var(--fn);font-size:10px;background:var(--sf2);padding:1px 6px;border-radius:3px;border:1px solid var(--bd)">' + esc(test.sourceFile) + '</span>';
+      h += '</div>' + renderReviewBtns(key) + '</div>';
+      h += '<div class="card-body ' + (cardOpen ? 'open' : '') + '" id="' + cardId + '">';
+      if (test.description) h += '<div style="padding:8px 18px;font-size:13px;color:var(--txd);border-bottom:1px solid var(--bd)">' + esc(test.description) + '</div>';
+      h += '<div class="section-label" style="color:var(--bl)">\u2193 INPUT (given)</div>';
+      test.given.forEach(g => {
+        if (!g.rows || !g.rows.length) return;
+        h += '<div class="tbl-wrap">' + renderTable(g.rows, 'var(--bl)', g.input + ' \u2014 ' + g.rows.length + ' rows') + '</div>';
+      });
+      h += '<div class="separator"></div>';
+      h += '<div class="section-label" style="color:var(--ac)">\u2191 EXPECTED OUTPUT</div>';
+      h += '<div class="tbl-wrap">' + renderTable(test.expect, 'var(--ac)', 'expect \u2014 ' + test.expect.length + ' rows') + '</div>';
+
+      // Branch coverage analysis
+      if (test.branchAnalysis?.length) {
+        const uncovered = test.branchAnalysis.filter(b => !b.covered);
+        const total = test.branchAnalysis.length;
+        const covered = total - uncovered.length;
+        h += '<div class="separator"></div>';
+        h += '<div class="section-label" style="color:' + (uncovered.length ? 'var(--or)' : 'var(--ac)') + '">';
+        h += '\u2194 BRANCH COVERAGE (' + covered + '/' + total + ')</div>';
+        h += '<div style="padding:4px 18px 10px;display:flex;flex-direction:column;gap:4px">';
+        test.branchAnalysis.forEach(b => {
+          const color = b.covered ? 'var(--ac)' : 'var(--or)';
+          const icon = b.covered ? '\u2713' : '\u2717';
+          h += '<div style="font-size:12px;font-family:var(--fn);display:flex;gap:8px;align-items:baseline">';
+          h += '<span style="color:' + color + '">' + icon + '</span>';
+          h += '<span class="badge" style="color:var(--txm);background:var(--sf2);font-size:10px">' + esc(b.type) + '</span>';
+          h += '<code style="color:var(--bl);font-size:12px">' + esc(b.condition) + '</code>';
+          if (!b.covered) h += '<span style="color:var(--txm);font-size:11px;font-style:italic">' + esc(b.coverageNote) + '</span>';
+          h += '</div>';
+        });
+        h += '</div>';
+      }
+
+      h += renderComment(key);
+      h += '</div></div>';
+    }
+
+    // Data tests
+    for (const test of group.data) {
+      const key = reviewKey(test);
+      if (!matchFilter(key, 'data')) continue;
+      const cardId = 'card_' + key.replace(/[^a-zA-Z0-9]/g, '_');
+      const cardOpen = openSections[cardId] !== false;
+      h += '<div class="card" data-review-key="' + esc(key) + '" onclick="focusCard(this)" style="' + cardBorderStyle(key) + '">';
+      h += '<div class="card-head clickable with-border" onclick="toggleSection(\'' + cardId + '\')">';
+      h += '<div style="display:flex;align-items:center;gap:10px">';
+      h += '<span class="arrow ' + (cardOpen ? 'open' : '') + '">\u25B6</span>';
+      h += '<span class="badge" style="color:var(--or);background:var(--orb)">Data Test</span>';
+      h += '<span class="card-name" style="font-size:14px">' + esc(test.name) + '</span>';
+      h += '</div>' + renderReviewBtns(key) + '</div>';
+      h += '<div class="card-body ' + (cardOpen ? 'open' : '') + '" id="' + cardId + '">';
+      if (test.inputs?.length) {
+        h += '<div style="padding:10px 18px;border-bottom:1px solid var(--bd)">';
+        h += '<span style="font-size:11px;font-weight:600;font-family:var(--fn);color:var(--bl);margin-right:8px">REFS:</span>';
+        test.inputs.forEach(r => h += '<span class="config-chip">' + esc(r) + '</span>');
+        h += '</div>';
+      }
+      h += '<pre class="sql-pre">' + highlightSQL(test.sql) + '</pre>';
+      h += renderComment(key);
+      h += '</div></div>';
+    }
+
+    // Model-level tests
+    for (const test of group.modelLevel) {
+      const key = reviewKey(test);
+      if (!matchFilter(key, 'schema')) continue;
+      const isUtils = test.name.startsWith('dbt_utils.');
+      const displayName = isUtils ? test.name.replace('dbt_utils.', '') : test.name;
+      h += '<div class="card" data-review-key="' + esc(key) + '" onclick="focusCard(this)" style="' + cardBorderStyle(key) + '"><div class="card-head"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">';
+      h += '<span class="badge" style="color:var(--cy);background:var(--cyb)">model-level</span>';
+      if (isUtils) h += '<span class="badge" style="color:var(--or);background:var(--orb)">dbt_utils</span>';
+      h += '<span class="card-name">' + esc(displayName) + '</span>';
+      h += '</div>' + renderReviewBtns(key) + '</div>';
+      h += renderConfig(test.config);
+      h += renderComment(key);
+      h += '</div>';
+    }
+
+    // Schema tests grouped by column
+    const colGroups = groupSchemaByColumn(group.schema);
+    for (const [colName, colGroup] of Object.entries(colGroups)) {
+      const key = 'col:' + modelName + ':' + colName;
+      if (!matchFilter(key, 'schema')) continue;
+
+      h += '<div class="card" data-review-key="' + esc(key) + '" onclick="focusCard(this)" style="' + cardBorderStyle(key) + '">';
+      h += '<div class="card-head"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">';
+      h += '<span class="badge" style="color:var(--pu);background:var(--pub)">Column</span>';
+      h += '<span class="card-name">' + esc(colName) + '</span>';
+      if (colGroup.data_type) h += '<span class="dtype-chip">' + esc(colGroup.data_type) + '</span>';
+      h += '<span style="font-size:11px;color:var(--txd)">' + colGroup.tests.length + ' tests</span>';
+      h += '</div>' + renderReviewBtns(key) + '</div>';
+      if (colGroup.description) {
+        h += '<div style="padding:4px 18px 8px;font-size:12px;color:var(--txd)">' + esc(colGroup.description) + '</div>';
+      }
+      h += '<div style="padding:6px 18px 10px;display:flex;flex-wrap:wrap;gap:6px">';
+      for (const st of colGroup.tests) {
+        const isUtils = st.name.startsWith('dbt_utils.');
+        const dn = isUtils ? st.name.replace('dbt_utils.', '') : st.name;
+        const color = isUtils ? 'var(--or)' : 'var(--pu)';
+        const bg = isUtils ? 'var(--orb)' : 'var(--pub)';
+        let badgeExtra = '';
+        if (st.config && Array.isArray(st.config.values)) badgeExtra = ' (' + st.config.values.length + ')';
+        h += '<span class="badge" style="color:' + color + ';background:' + bg + '">' + esc(dn) + badgeExtra + '</span>';
+      }
+      h += '</div>';
+      for (const st of colGroup.tests) {
+        if (st.config && Object.keys(st.config).length) {
+          h += '<div style="padding:2px 18px 4px;font-size:11px;color:var(--txm);font-family:var(--fn)">' + esc(st.name) + ':</div>';
+          h += renderConfig(st.config);
+        }
+      }
+      h += renderComment(key);
+      h += '</div>';
+    }
+
+    // Untested columns
+    if (cov) {
+      const untestedCols = cov.columns.filter(c => c.status === 'untested');
+      for (const col of untestedCols) {
+        if (colGroups[col.name]) continue;
+        const key = 'col:' + modelName + ':' + col.name;
+        if (!matchFilter(key, 'schema')) continue;
+        h += '<div class="card untested" data-review-key="' + esc(key) + '" onclick="focusCard(this)" style="' + cardBorderStyle(key) + '">';
+        h += '<div class="card-head"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">';
+        h += '<span class="badge" style="color:var(--or);background:var(--orb)">Untested</span>';
+        h += '<span class="card-name">' + esc(col.name) + '</span>';
+        if (col.data_type) h += '<span class="dtype-chip">' + esc(col.data_type) + '</span>';
+        h += '</div>' + renderReviewBtns(key) + '</div>';
+        if (col.description) {
+          h += '<div style="padding:4px 18px 8px;font-size:12px;color:var(--txd)">' + esc(col.description) + '</div>';
+        }
+        h += '<div class="no-test-guide">No tests defined. Add a test or explicitly exclude with <code style="font-family:var(--fn);font-size:11px">meta: { no_test: true, reason: "..." }</code> .</div>';
+        h += renderComment(key);
+        h += '</div>';
+      }
+    }
+
+    // Coverage summary
+    if (cov) {
+      const covId = 'cov_' + modelName.replace(/[^a-zA-Z0-9]/g, '_');
+      const covOpen = openSections[covId] === true;
+      h += '<div class="cov-summary">';
+      h += '<div class="cov-head" onclick="toggleSection(\'' + covId + '\')">';
+      h += '<div style="display:flex;align-items:center;gap:8px">';
+      h += '<span class="arrow ' + (covOpen ? 'open' : '') + '">\u25B6</span>';
+      h += '<span style="font-size:12px;font-weight:700;font-family:var(--fn)">Coverage</span>';
+      h += '<span style="font-size:12px;color:var(--txd)">' + cov.tested + ' tested, ' + cov.excluded + ' excluded, ' + cov.untested + ' untested / ' + cov.total + ' columns</span>';
+      h += '</div>';
+      h += '<span style="font-size:13px;font-weight:700;font-family:var(--fn);color:' + (cov.coveragePercent === 100 ? 'var(--ac)' : 'var(--or)') + '">' + cov.coveragePercent + '%</span>';
+      h += '</div>';
+      h += '<div class="cov-body ' + (covOpen ? 'open' : '') + '" id="' + covId + '">';
+      if (cov.untested) {
+        h += '<div style="margin-bottom:8px;font-size:11px;font-weight:700;color:var(--or)">Untested</div>';
+        cov.columns.filter(c => c.status === 'untested').forEach(c => {
+          h += '<div class="cov-item"><span style="color:var(--or)">\u25CF</span> ' + esc(c.name);
+          if (c.data_type) h += ' <span class="dtype-chip">' + esc(c.data_type) + '</span>';
+          h += '</div>';
+        });
+      }
+      if (cov.excluded) {
+        h += '<div style="margin:8px 0 4px;font-size:11px;font-weight:700;color:var(--txm)">Excluded</div>';
+        cov.columns.filter(c => c.status === 'excluded').forEach(c => {
+          h += '<div class="cov-item"><span style="color:var(--txm)">\u25CF</span> ' + esc(c.name) + ' <span style="color:var(--txm);font-style:italic">' + esc(c.excludeReason || '') + '</span></div>';
+        });
+      }
+      h += '<div style="margin:8px 0 4px;font-size:11px;font-weight:700;color:var(--ac)">Tested</div>';
+      cov.columns.filter(c => c.status === 'tested').forEach(c => {
+        h += '<div class="cov-item"><span style="color:var(--ac)">\u25CF</span> ' + esc(c.name) + ' <span style="color:var(--txd)">(' + c.testCount + ')</span></div>';
+      });
+      h += '</div></div>';
+    }
+
+    // Semantic Layer cards for this model (one card per semantic model)
+    const modelWarnings = (DATA.semanticWarnings || []).filter(w => w.model === modelName);
+    const modelSM = (DATA.semanticModels || []).filter(sm => sm.modelRef === modelName);
+    const allMetrics = (DATA.metrics || []);
+    for (const sm of modelSM) {
+      const smKey = 'semantic:' + sm.name + ':' + modelName;
+      if (!matchFilter(smKey, 'semantic')) continue;
+      // Filter metrics belonging to this semantic model
+      const smMetrics = allMetrics.filter(mt => mt.semanticModel === sm.name);
+      // Build measure→metric lookup for this semantic model
+      const measureToMetrics = {};
+      smMetrics.forEach(mt => {
+        if (mt.measure && mt.type !== 'derived') {
+          if (!measureToMetrics[mt.measure]) measureToMetrics[mt.measure] = [];
+          measureToMetrics[mt.measure].push(mt);
+        }
+      });
+      const derivedMetrics = smMetrics.filter(mt => mt.type === 'derived');
+
+      h += '<div class="card" data-review-key="' + esc(smKey) + '" onclick="focusCard(this)" style="border-color:var(--cy);' + cardBorderStyle(smKey) + '">';
+      h += '<div class="card-head with-border"><div style="display:flex;align-items:center;gap:8px">';
+      h += '<span class="badge" style="color:var(--cy);background:var(--cyb)">Semantic Layer</span>';
+      h += '<span class="card-name">' + esc(sm.name) + '</span>';
+      h += '</div>' + renderReviewBtns(smKey) + '</div>';
+
+      // Description
+      if (sm.description) {
+        h += '<div style="padding:4px 18px 8px;font-size:12px;color:var(--txd)">' + esc(sm.description) + '</div>';
+      }
+
+      // defaults.agg_time_dimension
+      if (sm.defaults && sm.defaults.agg_time_dimension) {
+        h += '<div style="padding:4px 18px 6px;display:flex;align-items:center;gap:6px">';
+        h += '<span style="font-size:11px;font-family:var(--fn);font-weight:600;color:var(--txm)">agg_time_dimension</span>';
+        h += '<span style="font-size:11px;font-family:var(--fn);color:var(--cy)">' + esc(sm.defaults.agg_time_dimension) + '</span>';
+        h += '</div>';
+      }
+
+      // --- ENTITIES section ---
+      if (sm.entities.length) {
+        h += '<div style="padding:10px 18px 2px;font-size:10px;font-weight:700;font-family:var(--fn);color:var(--txm);letter-spacing:.05em;text-transform:uppercase">Entities</div>';
+        h += '<div style="padding:0 18px 8px;overflow-x:auto">';
+        h += '<table style="width:100%;border-collapse:collapse;font-size:12px">';
+        h += '<thead><tr style="border-bottom:2px solid var(--bd)">';
+        h += '<th style="padding:6px 12px 6px 0;text-align:left;font-size:10px;font-weight:700;font-family:var(--fn);color:var(--txm);letter-spacing:.03em">NAME</th>';
+        h += '<th style="padding:6px 12px 6px 0;text-align:left;font-size:10px;font-weight:700;font-family:var(--fn);color:var(--txm);letter-spacing:.03em">EXPR</th>';
+        h += '<th style="padding:6px 0;text-align:left;font-size:10px;font-weight:700;font-family:var(--fn);color:var(--txm);letter-spacing:.03em">TYPE</th>';
+        h += '</tr></thead><tbody>';
+        sm.entities.forEach(e => {
+          const typeColor = e.type === 'primary' ? 'var(--ac)' : e.type === 'foreign' ? 'var(--bl)' : 'var(--txm)';
+          h += '<tr style="border-bottom:1px solid var(--bd)">';
+          h += '<td style="padding:5px 12px 5px 0;font-family:var(--fn);color:var(--pu);font-weight:600">' + esc(e.name) + '</td>';
+          h += '<td style="padding:5px 12px 5px 0;font-family:var(--fn);color:var(--txd);font-size:11px">' + esc(e.expr) + '</td>';
+          h += '<td style="padding:5px 0"><span style="font-size:10px;font-family:var(--fn);font-weight:600;color:' + typeColor + ';text-transform:uppercase;letter-spacing:.03em">' + esc(e.type || '') + '</span></td>';
+          h += '</tr>';
+        });
+        h += '</tbody></table></div>';
+      }
+
+      // --- MEASURES → METRICS section (merged view) ---
+      if (sm.measures.length) {
+        // Build metric rows: simple/cumulative metrics with their measure info
+        const simpleMetrics = smMetrics.filter(mt => mt.type !== 'derived');
+        const measureMap = {};
+        sm.measures.forEach(m => { measureMap[m.name] = m; });
+
+        // Metrics section (simple/cumulative)
+        if (simpleMetrics.length) {
+          h += '<div style="padding:10px 18px 2px;font-size:10px;font-weight:700;font-family:var(--fn);color:var(--txm);letter-spacing:.05em;text-transform:uppercase">Metrics</div>';
+          h += '<div style="padding:0 18px 8px;overflow-x:auto">';
+          h += '<table style="width:100%;border-collapse:collapse;font-size:12px">';
+          h += '<thead><tr style="border-bottom:2px solid var(--bd)">';
+          h += '<th style="padding:6px 12px 6px 0;text-align:left;font-size:10px;font-weight:700;font-family:var(--fn);color:var(--txm);letter-spacing:.03em">METRIC</th>';
+          h += '<th style="padding:6px 12px 6px 0;text-align:left;font-size:10px;font-weight:700;font-family:var(--fn);color:var(--txm);letter-spacing:.03em">LABEL</th>';
+          h += '<th style="padding:6px 12px 6px 0;text-align:left;font-size:10px;font-weight:700;font-family:var(--fn);color:var(--txm);letter-spacing:.03em">MEASURE</th>';
+          h += '<th style="padding:6px 12px 6px 0;text-align:left;font-size:10px;font-weight:700;font-family:var(--fn);color:var(--txm);letter-spacing:.03em">AGG</th>';
+          h += '<th style="padding:6px 12px 6px 0;text-align:left;font-size:10px;font-weight:700;font-family:var(--fn);color:var(--txm);letter-spacing:.03em">EXPR</th>';
+          h += '<th style="padding:6px 0;text-align:left;font-size:10px;font-weight:700;font-family:var(--fn);color:var(--txm);letter-spacing:.03em">DESCRIPTION</th>';
+          h += '</tr></thead><tbody>';
+          simpleMetrics.forEach(mt => {
+            const m = measureMap[mt.measure] || {};
+            // Collect conditions: filter, measureFilter, other typeParams
+            const conditions = [];
+            if (mt.filter) conditions.push({ key: 'filter', val: mt.filter });
+            if (mt.measureFilter) conditions.push({ key: 'measure filter', val: mt.measureFilter });
+            if (mt.typeParams) {
+              for (const [k, v] of Object.entries(mt.typeParams)) {
+                conditions.push({ key: k, val: typeof v === 'object' ? JSON.stringify(v) : String(v) });
+              }
+            }
+            h += '<tr style="border-bottom:1px solid var(--bd)">';
+            h += '<td style="padding:5px 12px 5px 0;font-family:var(--fn);color:var(--cy);font-weight:600">' + esc(mt.name) + '</td>';
+            h += '<td style="padding:5px 12px 5px 0;color:var(--tx)">' + esc(mt.label || '') + '</td>';
+            h += '<td style="padding:5px 12px 5px 0;font-family:var(--fn);color:var(--txd);font-size:11px">' + esc(mt.measure || '') + '</td>';
+            h += '<td style="padding:5px 12px 5px 0"><span style="font-size:10px;font-family:var(--fn);padding:1px 5px;border-radius:3px;background:var(--bg2,var(--s1));color:var(--txm)">' + esc(m.agg || '') + '</span></td>';
+            h += '<td style="padding:5px 12px 5px 0;font-family:var(--fn);color:var(--txd);font-size:11px">' + esc(m.expr || '') + '</td>';
+            h += '<td style="padding:5px 0;color:var(--txd);font-size:11px">' + esc(mt.description || '') + '</td>';
+            h += '</tr>';
+            // Render conditions as sub-row
+            if (conditions.length) {
+              h += '<tr style="border-bottom:1px solid var(--bd)">';
+              h += '<td colspan="6" style="padding:2px 12px 6px 24px">';
+              conditions.forEach(c => {
+                h += '<div style="display:flex;gap:6px;align-items:baseline;font-size:11px;padding:1px 0">';
+                h += '<span style="font-family:var(--fn);font-weight:600;color:var(--or);white-space:nowrap">' + esc(c.key) + ':</span>';
+                h += '<span style="font-family:var(--fn);color:var(--txd);word-break:break-all">' + esc(c.val) + '</span>';
+                h += '</div>';
+              });
+              h += '</td></tr>';
+            }
+          });
+          h += '</tbody></table></div>';
+        }
+
+        // Orphan measures (not referenced by any metric)
+        const referencedMeasures = new Set(smMetrics.map(mt => mt.measure).filter(Boolean));
+        const orphanMeasures = sm.measures.filter(m => !referencedMeasures.has(m.name));
+        if (orphanMeasures.length) {
+          h += '<div style="padding:10px 18px 2px;font-size:10px;font-weight:700;font-family:var(--fn);color:var(--or);letter-spacing:.05em;text-transform:uppercase">Measures without Metrics</div>';
+          h += '<div style="padding:0 18px 8px;overflow-x:auto">';
+          h += '<table style="width:100%;border-collapse:collapse;font-size:12px">';
+          h += '<thead><tr style="border-bottom:2px solid var(--bd)">';
+          h += '<th style="padding:6px 12px 6px 0;text-align:left;font-size:10px;font-weight:700;font-family:var(--fn);color:var(--txm);letter-spacing:.03em">MEASURE</th>';
+          h += '<th style="padding:6px 12px 6px 0;text-align:left;font-size:10px;font-weight:700;font-family:var(--fn);color:var(--txm);letter-spacing:.03em">AGG</th>';
+          h += '<th style="padding:6px 12px 6px 0;text-align:left;font-size:10px;font-weight:700;font-family:var(--fn);color:var(--txm);letter-spacing:.03em">EXPR</th>';
+          h += '<th style="padding:6px 0;text-align:left;font-size:10px;font-weight:700;font-family:var(--fn);color:var(--txm);letter-spacing:.03em">DESCRIPTION</th>';
+          h += '</tr></thead><tbody>';
+          orphanMeasures.forEach(m => {
+            h += '<tr style="border-bottom:1px solid var(--bd)">';
+            h += '<td style="padding:5px 12px 5px 0;font-family:var(--fn);color:var(--or);font-weight:600">' + esc(m.name) + '</td>';
+            h += '<td style="padding:5px 12px 5px 0"><span style="font-size:10px;font-family:var(--fn);padding:1px 5px;border-radius:3px;background:var(--bg2,var(--s1));color:var(--txm)">' + esc(m.agg || '') + '</span></td>';
+            h += '<td style="padding:5px 12px 5px 0;font-family:var(--fn);color:var(--txd);font-size:11px">' + esc(m.expr || '') + '</td>';
+            h += '<td style="padding:5px 0;color:var(--txd);font-size:11px">' + esc(m.description || '') + '</td>';
+            h += '</tr>';
+          });
+          h += '</tbody></table></div>';
+        }
+
+        // No metrics defined at all — show raw measures
+        if (!simpleMetrics.length && !derivedMetrics.length && sm.measures.length) {
+          h += '<div style="padding:10px 18px 2px;font-size:10px;font-weight:700;font-family:var(--fn);color:var(--txm);letter-spacing:.05em;text-transform:uppercase">Measures</div>';
+          h += '<div style="padding:0 18px 8px;overflow-x:auto">';
+          h += '<table style="width:100%;border-collapse:collapse;font-size:12px">';
+          h += '<thead><tr style="border-bottom:2px solid var(--bd)">';
+          h += '<th style="padding:6px 12px 6px 0;text-align:left;font-size:10px;font-weight:700;font-family:var(--fn);color:var(--txm);letter-spacing:.03em">MEASURE</th>';
+          h += '<th style="padding:6px 12px 6px 0;text-align:left;font-size:10px;font-weight:700;font-family:var(--fn);color:var(--txm);letter-spacing:.03em">AGG</th>';
+          h += '<th style="padding:6px 12px 6px 0;text-align:left;font-size:10px;font-weight:700;font-family:var(--fn);color:var(--txm);letter-spacing:.03em">EXPR</th>';
+          h += '<th style="padding:6px 0;text-align:left;font-size:10px;font-weight:700;font-family:var(--fn);color:var(--txm);letter-spacing:.03em">DESCRIPTION</th>';
+          h += '</tr></thead><tbody>';
+          sm.measures.forEach(m => {
+            h += '<tr style="border-bottom:1px solid var(--bd)">';
+            h += '<td style="padding:5px 12px 5px 0;font-family:var(--fn);color:var(--cy);font-weight:600">' + esc(m.name) + '</td>';
+            h += '<td style="padding:5px 12px 5px 0"><span style="font-size:10px;font-family:var(--fn);padding:1px 5px;border-radius:3px;background:var(--bg2,var(--s1));color:var(--txm)">' + esc(m.agg || '') + '</span></td>';
+            h += '<td style="padding:5px 12px 5px 0;font-family:var(--fn);color:var(--txd);font-size:11px">' + esc(m.expr || '') + '</td>';
+            h += '<td style="padding:5px 0;color:var(--txd);font-size:11px">' + esc(m.description || '') + '</td>';
+            h += '</tr>';
+          });
+          h += '</tbody></table></div>';
+        }
+      }
+
+      // --- DERIVED METRICS section ---
+      if (derivedMetrics.length) {
+        h += '<div style="padding:10px 18px 2px;font-size:10px;font-weight:700;font-family:var(--fn);color:var(--txm);letter-spacing:.05em;text-transform:uppercase">Derived Metrics</div>';
+        h += '<div style="padding:0 18px 8px;overflow-x:auto">';
+        h += '<table style="width:100%;border-collapse:collapse;font-size:12px">';
+        h += '<thead><tr style="border-bottom:2px solid var(--bd)">';
+        h += '<th style="padding:6px 12px 6px 0;text-align:left;font-size:10px;font-weight:700;font-family:var(--fn);color:var(--txm);letter-spacing:.03em">NAME</th>';
+        h += '<th style="padding:6px 12px 6px 0;text-align:left;font-size:10px;font-weight:700;font-family:var(--fn);color:var(--txm);letter-spacing:.03em">LABEL</th>';
+        h += '<th style="padding:6px 12px 6px 0;text-align:left;font-size:10px;font-weight:700;font-family:var(--fn);color:var(--txm);letter-spacing:.03em">FORMULA</th>';
+        h += '<th style="padding:6px 12px 6px 0;text-align:left;font-size:10px;font-weight:700;font-family:var(--fn);color:var(--txm);letter-spacing:.03em">REFERENCES</th>';
+        h += '<th style="padding:6px 0;text-align:left;font-size:10px;font-weight:700;font-family:var(--fn);color:var(--txm);letter-spacing:.03em">DESCRIPTION</th>';
+        h += '</tr></thead><tbody>';
+        derivedMetrics.forEach(mt => {
+          h += '<tr style="border-bottom:1px solid var(--bd)">';
+          h += '<td style="padding:5px 12px 5px 0;font-family:var(--fn);color:var(--cy);font-weight:600">' + esc(mt.name) + '</td>';
+          h += '<td style="padding:5px 12px 5px 0;color:var(--tx)">' + esc(mt.label || '') + '</td>';
+          h += '<td style="padding:5px 12px 5px 0;font-family:var(--fn);color:var(--txd);font-size:11px">' + esc(mt.expr || '') + '</td>';
+          h += '<td style="padding:5px 12px 5px 0">' + (mt.metrics || []).map(r => '<span style="font-size:10px;font-family:var(--fn);padding:1px 5px;border-radius:3px;background:var(--pub);color:var(--pu)">' + esc(r) + '</span>').join(' ') + '</td>';
+          h += '<td style="padding:5px 0;color:var(--txd);font-size:11px">' + esc(mt.description || '') + '</td>';
+          h += '</tr>';
+        });
+        h += '</tbody></table></div>';
+      }
+
+      // --- DIMENSIONS section ---
+      if (sm.dimensions.length) {
+        h += '<div style="padding:10px 18px 2px;font-size:10px;font-weight:700;font-family:var(--fn);color:var(--txm);letter-spacing:.05em;text-transform:uppercase">Dimensions</div>';
+        h += '<div style="padding:0 18px 8px;overflow-x:auto">';
+        h += '<table style="width:100%;border-collapse:collapse;font-size:12px">';
+        h += '<thead><tr style="border-bottom:2px solid var(--bd)">';
+        h += '<th style="padding:6px 12px 6px 0;text-align:left;font-size:10px;font-weight:700;font-family:var(--fn);color:var(--txm);letter-spacing:.03em">NAME</th>';
+        h += '<th style="padding:6px 12px 6px 0;text-align:left;font-size:10px;font-weight:700;font-family:var(--fn);color:var(--txm);letter-spacing:.03em">EXPR</th>';
+        h += '<th style="padding:6px 12px 6px 0;text-align:left;font-size:10px;font-weight:700;font-family:var(--fn);color:var(--txm);letter-spacing:.03em">TYPE</th>';
+        h += '<th style="padding:6px 0;text-align:left;font-size:10px;font-weight:700;font-family:var(--fn);color:var(--txm);letter-spacing:.03em">DESCRIPTION</th>';
+        h += '</tr></thead><tbody>';
+        sm.dimensions.forEach(d => {
+          const typeColor = d.type === 'time' ? 'var(--or)' : 'var(--txm)';
+          h += '<tr style="border-bottom:1px solid var(--bd)">';
+          h += '<td style="padding:5px 12px 5px 0;font-family:var(--fn);color:var(--bl);font-weight:600">' + esc(d.name) + '</td>';
+          h += '<td style="padding:5px 12px 5px 0;font-family:var(--fn);color:var(--txd);font-size:11px">' + esc(d.expr) + '</td>';
+          const granularity = d.typeParams && d.typeParams.time_granularity ? ' <span style="opacity:.6;font-weight:400">(' + esc(d.typeParams.time_granularity) + ')</span>' : '';
+          h += '<td style="padding:5px 12px 5px 0"><span style="font-size:10px;font-family:var(--fn);font-weight:600;color:' + typeColor + ';text-transform:uppercase;letter-spacing:.03em">' + esc(d.type || '') + granularity + '</span></td>';
+          h += '<td style="padding:5px 0;color:var(--txd);font-size:11px">' + esc(d.description || '') + '</td>';
+          h += '</tr>';
+        });
+        h += '</tbody></table></div>';
+      }
+
+      // Warnings for this semantic model
+      const smWarnings = modelWarnings.filter(w => !w.semanticModel || w.semanticModel === sm.name);
+      if (smWarnings.length) {
+        h += '<div style="padding:8px 18px;border-top:1px solid var(--bd);background:var(--orb)">';
+        smWarnings.forEach(w => {
+          h += '<div style="padding:3px 0;font-size:12px;color:var(--or)">\u26A0 ' + esc(w.hint) + '</div>';
+        });
+        h += '</div>';
+      }
+
+      // Raw YAML toggle
+      if (sm.sourceFile && (DATA.fileContents || {})[sm.sourceFile]) {
+        const rawId = 'raw_sm_' + sm.name.replace(/[^a-zA-Z0-9]/g, '_');
+        h += '<div style="padding:8px 18px;display:flex;justify-content:flex-end">';
+        h += '<button class="raw-btn" onclick="event.stopPropagation();toggleRaw(\'' + rawId + '\')">\u2630 YAML</button>';
+        h += '</div>';
+        h += '<pre class="raw-pre" id="' + rawId + '" style="display:none">' + highlightYAML((DATA.fileContents || {})[sm.sourceFile]) + '</pre>';
+      }
+
+      h += renderComment(smKey);
+      h += '</div>';
+    }
+    // Orphan warnings (not tied to a specific semantic model)
+    if (!modelSM.length && modelWarnings.length) {
+      h += '<div class="card" style="border-color:var(--cy)">';
+      h += '<div class="card-head with-border"><div style="display:flex;align-items:center;gap:8px">';
+      h += '<span class="badge" style="color:var(--cy);background:var(--cyb)">Semantic Layer</span>';
+      h += '</div></div>';
+      h += '<div style="padding:8px 18px;background:var(--orb)">';
+      modelWarnings.forEach(w => {
+        h += '<div style="padding:3px 0;font-size:12px;color:var(--or)">\u26A0 ' + esc(w.hint) + '</div>';
+      });
+      h += '</div>';
+      h += '</div>';
+    }
+
+    // CTE Structure for this model
+    const cteResults = DATA.cteResults || {};
+    for (const [file, parsed] of Object.entries(cteResults)) {
+      const cteModelName = file.split('/').pop().replace(/\.sql$/i, '');
+      if (cteModelName !== modelName) continue;
+      const cteId = 'cte_' + file.replace(/[^a-zA-Z0-9]/g, '_');
+      const isCtOpen = openSections[cteId] === true;
+      h += '<div class="cte-card">';
+      h += '<div class="cte-head" onclick="toggleSection(\'' + cteId + '\')">';
+      h += '<span class="arrow ' + (isCtOpen ? 'open' : '') + '">\u25B6</span>';
+      h += '<span class="badge" style="color:var(--cy);background:var(--cyb)">CTE</span>';
+      h += '<span style="font-size:11px;color:var(--txd)">' + esc(file.split('/').pop()) + '</span>';
+      h += '<span class="card-dim">' + parsed.ctes.length + ' CTEs</span>';
+      h += '</div>';
+      h += '<div class="cte-body" id="' + cteId + '" style="display:' + (isCtOpen ? 'block' : 'none') + '">';
+      h += renderCTEGraph(parsed);
+      h += '</div></div>';
+    }
+
+    h += '</div></div>';
+  }
+
+  if (!Object.keys(models).length) h += '<div style="text-align:center;padding:40px;color:var(--txm)">No matching tests</div>';
+
+
+  h += renderExportPanel(stats);
+  h += '</div>'; // close content padding wrapper
+  document.getElementById('app').innerHTML = h;
+  renderSidebar();
+}
+
+function renderExportPanel(stats) {
+  const hasReviews = Object.values(reviews).some(r => r !== 'pending') || Object.values(comments).some(c => c?.trim());
+  let h = '<div class="export-panel">';
+  h += '<div class="export-head"><div>';
+  h += '<div style="font-size:14px;font-weight:700;display:flex;align-items:center;gap:8px"><span style="font-size:16px">\u2318</span> Export to Claude Code</div>';
+  h += '<div style="font-size:12px;color:var(--txd);margin-top:2px">Copy review results as a prompt for Claude Code</div>';
+  h += '</div><div style="display:flex;gap:8px;align-items:center">';
+  h += '<span style="font-size:12px;color:var(--txd)">Reviewed: ' + (stats.approved + stats.needs_change) + '/' + stats.total + '</span>';
+  if (stats.needs_change > 0) h += '<span class="badge" style="color:var(--rd);background:var(--rdb)">Needs Change ' + stats.needs_change + '</span>';
+  h += '</div></div>';
+  h += '<div class="export-body">';
+  if (!hasReviews) {
+    h += '<div style="color:var(--txm);font-size:13px;text-align:center;padding:12px">Review tests and add comments to generate a prompt here</div>';
+  } else {
+    h += '<button class="preview-btn" onclick="togglePreview()"><span>Preview</span><span id="preview-arrow">\u25BC</span></button>';
+    h += '<pre class="preview-pre" id="preview-content" style="display:none"></pre>';
+    h += '<button class="copy-btn" id="copy-btn" onclick="copyPrompt()">\uD83D\uDCCB Copy Prompt</button>';
+    h += '<div style="margin-top:12px;font-size:11px;color:var(--txm);line-height:1.6">';
+    h += 'After copying, launch <code style="font-family:var(--fn);color:var(--cy);background:var(--cyb);padding:1px 6px;border-radius:3px">claude</code> in your terminal and paste';
+    h += '</div>';
+  }
+  h += '</div></div>';
+  return h;
+}
+
+function generatePrompt() {
+  const tests = DATA.allTests;
+  const coverage = DATA.coverageData || [];
+  const items = [];
+  const seenKeys = new Set();
+
+  tests.forEach(t => {
+    const key = reviewKey(t);
+    if (seenKeys.has(key)) return;
+    seenKeys.add(key);
+    const status = reviews[key], comment = (comments[key] || '').trim();
+    if (status === 'pending' && !comment) return;
+    const sl = status === 'approved' ? 'OK' : status === 'needs_change' ? 'Needs Change' : 'Pending';
+    let entry = '[' + sl + '] ' + t.type.toUpperCase() + ': ' + t.name;
+    if (t.sourceFile) entry += ' (' + t.sourceFile + ')';
+    if (t.model) entry += ' \u2192 ' + t.model;
+    if (t.column && t.column !== '(model-level)') entry += '.' + t.column;
+    if (comment) entry += '\n  Comment: ' + comment;
+    if (t.type === 'unit' && status === 'needs_change') {
+      t.given.forEach(g => entry += '\n  given ' + g.input + ': ' + JSON.stringify(g.rows));
+      entry += '\n  expect: ' + JSON.stringify(t.expect);
+    }
+    items.push(entry);
+  });
+
+  // Include untested column reviews
+  coverage.forEach(cov => {
+    cov.columns.filter(c => c.status === 'untested').forEach(c => {
+      const key = 'col:' + cov.model + ':' + c.name;
+      if (seenKeys.has(key)) return;
+      seenKeys.add(key);
+      const status = reviews[key], comment = (comments[key] || '').trim();
+      if (status === 'pending' && !comment) return;
+      const sl = status === 'approved' ? 'OK' : status === 'needs_change' ? 'Needs Change' : 'Pending';
+      let entry = '[' + sl + '] UNTESTED COLUMN: ' + cov.model + '.' + c.name;
+      if (comment) entry += '\n  Comment: ' + comment;
+      items.push(entry);
+    });
+  });
+
+  // Include semantic model reviews
+  (DATA.semanticModels || []).forEach(sm => {
+    const key = 'semantic:' + sm.name + ':' + sm.modelRef;
+    if (seenKeys.has(key)) return;
+    seenKeys.add(key);
+    const status = reviews[key], comment = (comments[key] || '').trim();
+    if (status === 'pending' && !comment) return;
+    const sl = status === 'approved' ? 'OK' : status === 'needs_change' ? 'Needs Change' : 'Pending';
+    let entry = '[' + sl + '] SEMANTIC MODEL: ' + sm.name + ' (model: ' + sm.modelRef + ')';
+    if (comment) entry += '\n  Comment: ' + comment;
+    items.push(entry);
+  });
+
+  if (!items.length) return '';
+  const nf = Object.values(reviews).filter(r => r === 'needs_change').length;
+  const ap = Object.values(reviews).filter(r => r === 'approved').length;
+  const total = Object.keys(reviews).length;
+  let p = 'dbt test review results.\nReviewed: ' + (ap + nf) + '/' + total + ' (OK: ' + ap + ', Needs Change: ' + nf + ')\n\n';
+  p += items.join('\n\n');
+
+  if (coverage.length) {
+    p += '\n\n## Coverage\n';
+    coverage.forEach(c => {
+      p += c.model + ': ' + c.coveragePercent + '% (' + c.tested + ' tested, ' + c.excluded + ' excluded, ' + c.untested + ' untested)\n';
+      c.columns.filter(col => col.status === 'untested').forEach(col => {
+        p += '  Untested: ' + col.name + '\n';
+      });
+    });
+  }
+
+  if (nf > 0) p += '\n\nPlease fix the tests marked as "Needs Change" based on the review comments.';
+  return p;
+}
+
+window.setReview = function(key, status) { reviews[key] = status; render(); };
+window.setComment = function(key, val) { comments[key] = val; };
+window.setFilter = function(f) { filter = f; render(); };
+window.toggleSection = function(id) {
+  if (openSections[id] === undefined) {
+    // Coverage sections (cov_*) default closed, all others default open
+    openSections[id] = id.startsWith('cov_') ? true : false;
+  } else {
+    openSections[id] = !openSections[id];
+  }
+  render();
+};
+window.togglePreview = function() {
+  const el = document.getElementById('preview-content');
+  const arrow = document.getElementById('preview-arrow');
+  if (el.style.display === 'none') { el.style.display = 'block'; el.textContent = generatePrompt(); arrow.textContent = '\u25B2'; }
+  else { el.style.display = 'none'; arrow.textContent = '\u25BC'; }
+};
+window.copyPrompt = async function() {
+  const text = generatePrompt();
+  try { await navigator.clipboard.writeText(text); } catch {
+    const ta = document.createElement('textarea'); ta.value = text;
+    document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+  }
+  const btn = document.getElementById('copy-btn');
+  btn.textContent = '\u2713 Copied!'; btn.classList.add('copied');
+  setTimeout(() => { btn.textContent = '\uD83D\uDCCB Copy Prompt'; btn.classList.remove('copied'); }, 2000);
+};
+
+window.toggleRaw = function(id) {
+  const el = document.getElementById(id);
+  const btn = el.previousElementSibling.querySelector('.raw-btn');
+  if (el.style.display === 'none') { el.style.display = 'block'; btn.classList.add('active'); }
+  else { el.style.display = 'none'; btn.classList.remove('active'); }
+};
+
+let focusedCardIndex = -1;
+const getReviewCards = () => [...document.querySelectorAll('.card[data-review-key]')];
+
+window.focusCard = function(el) {
+  const cards = getReviewCards();
+  const idx = cards.indexOf(el.closest('.card[data-review-key]'));
+  if (idx === -1) return;
+  focusedCardIndex = idx;
+  cards.forEach(c => c.classList.remove('focused'));
+  cards[focusedCardIndex].classList.add('focused');
+};
+
+document.addEventListener('keydown', function(e) {
+  if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') return;
+  const cards = getReviewCards();
+  if (e.key === '?' || e.key === '/') {
+    const help = document.getElementById('kbd-help');
+    if (help) help.style.display = help.style.display === 'none' ? 'block' : 'none';
+    return;
+  }
+  if (!cards.length) return;
+  if (e.key === 'j') {
+    focusedCardIndex = Math.min(focusedCardIndex + 1, cards.length - 1);
+    cards.forEach(c => c.classList.remove('focused'));
+    cards[focusedCardIndex].classList.add('focused');
+    cards[focusedCardIndex].scrollIntoView({ behavior: 'smooth', block: 'center' });
+  } else if (e.key === 'k') {
+    focusedCardIndex = Math.max(focusedCardIndex - 1, 0);
+    cards.forEach(c => c.classList.remove('focused'));
+    cards[focusedCardIndex].classList.add('focused');
+    cards[focusedCardIndex].scrollIntoView({ behavior: 'smooth', block: 'center' });
+  } else if (e.key === '1' && focusedCardIndex >= 0 && focusedCardIndex < cards.length) {
+    const key = cards[focusedCardIndex].dataset.reviewKey;
+    if (key) setReview(key, 'approved');
+  } else if (e.key === '2' && focusedCardIndex >= 0 && focusedCardIndex < cards.length) {
+    const key = cards[focusedCardIndex].dataset.reviewKey;
+    if (key) setReview(key, 'needs_change');
+  } else if (e.key === '3' && focusedCardIndex >= 0 && focusedCardIndex < cards.length) {
+    const key = cards[focusedCardIndex].dataset.reviewKey;
+    if (key) setReview(key, 'pending');
+  }
+});
+
+init();
+</script></body></html>

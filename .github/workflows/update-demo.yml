@@ -1,0 +1,38 @@
+name: Update Demo Page
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/template.html"
+      - "bin/cli.mjs"
+
+permissions:
+  contents: write
+
+jobs:
+  update-demo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Regenerate demo
+        run: node bin/cli.mjs demo --out docs
+
+      - name: Check for changes
+        id: diff
+        run: |
+          git diff --quiet docs/ && echo "changed=false" >> "$GITHUB_OUTPUT" || echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Commit and push
+        if: steps.diff.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/index.html
+          git commit -m "chore: regenerate demo page [skip ci]"
+          git push

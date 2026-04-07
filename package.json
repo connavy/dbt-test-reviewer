@@ -1,0 +1,40 @@
+{
+  "name": "dbt-test-reviewer",
+  "version": "0.1.0",
+  "description": "Visualize dbt test input/output for review — CLI, local preview, and GitHub Actions",
+  "type": "module",
+  "bin": {
+    "dbt-test-review": "./bin/cli.mjs"
+  },
+  "files": [
+    "bin/",
+    "src/"
+  ],
+  "scripts": {
+    "preview": "node bin/cli.mjs preview",
+    "serve": "node bin/cli.mjs serve",
+    "markdown": "node bin/cli.mjs markdown",
+    "test": "node --test test/*.test.mjs"
+  },
+  "keywords": [
+    "dbt",
+    "testing",
+    "review",
+    "data-engineering",
+    "metricflow",
+    "code-review",
+    "test-coverage"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/connavy/dbt-test-reviewer.git"
+  },
+  "homepage": "https://connavy.github.io/dbt-test-reviewer/",
+  "bugs": {
+    "url": "https://github.com/connavy/dbt-test-reviewer/issues"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

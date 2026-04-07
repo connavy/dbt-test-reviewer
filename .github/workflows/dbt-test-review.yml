@@ -1,0 +1,32 @@
+name: dbt Test Review
+
+on:
+  pull_request:
+    paths:
+      - "models/**/*.yml"
+      - "models/**/*.yaml"
+      - "tests/**/*.sql"
+      - "macros/**/*.sql"
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  test-review:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Run dbt Test Reviewer
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: npx dbt-test-reviewer@latest
