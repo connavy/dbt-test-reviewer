@@ -478,27 +478,43 @@ export function parseDataTestSQL(sql) {
    SQL Branch Detection
    ═══════════════════════════════════════════════ */
 export function extractBranches(sql) {
-  const cleaned = sql.replace(/--.*$/gm, " ").replace(/\/\*[\s\S]*?\*\//g, " ")
-    .replace(/\{\{[\s\S]*?\}\}/g, " ") // strip Jinja
-    .replace(/\n/g, " "); // normalise newlines for cross-line matching
+  // Build line offset map from original SQL
+  const lines = sql.split('\n');
+  const lineOffsets = [0];
+  for (let i = 0; i < lines.length; i++) lineOffsets.push(lineOffsets[i] + lines[i].length + 1);
+  function offsetToLine(offset) {
+    for (let i = 1; i < lineOffsets.length; i++) {
+      if (offset < lineOffsets[i]) return i;
+    }
+    return lines.length;
+  }
+
+  // Strip comments/Jinja with same-length spaces to preserve offsets (keep newlines for line mapping)
+  const stripped = sql
+    .replace(/--.*$/gm, m => ' '.repeat(m.length))
+    .replace(/\/\*[\s\S]*?\*\//g, m => m.replace(/[^\n]/g, ' '))
+    .replace(/\{\{[\s\S]*?\}\}/g, m => m.replace(/[^\n]/g, ' '));
+  // Collapse newlines for cross-line regex matching, but use original offset for line lookup
+  const cleaned = stripped.replace(/\n/g, ' ');
+
   const branches = [];
 
-  // CASE WHEN ... THEN (negative lookahead prevents matching nested WHEN inside condition)
+  // CASE WHEN ... THEN
   for (const m of cleaned.matchAll(/WHEN\s+((?:(?!\bWHEN\b|\bTHEN\b).)+?)\s+THEN/gi)) {
-    branches.push({ type: "case_when", condition: m[1].trim() });
+    branches.push({ type: "case_when", condition: m[1].trim(), line: offsetToLine(m.index) });
   }
   // ELSE (from CASE)
   for (const m of cleaned.matchAll(/ELSE\s+(.+?)(?=\bEND\b)/gi)) {
     const val = m[1].trim();
-    if (val) branches.push({ type: "case_else", condition: "ELSE" });
+    if (val) branches.push({ type: "case_else", condition: "ELSE", line: offsetToLine(m.index) });
   }
-  // COALESCE → implicit null branch
+  // COALESCE
   for (const m of cleaned.matchAll(/COALESCE\s*\(([^,)]+)/gi)) {
-    branches.push({ type: "coalesce", condition: `${m[1].trim()} IS NULL` });
+    branches.push({ type: "coalesce", condition: `${m[1].trim()} IS NULL`, line: offsetToLine(m.index) });
   }
   // IIF / IF
   for (const m of cleaned.matchAll(/\bI?IF\s*\((.+?)(?:,)/gi)) {
-    branches.push({ type: "iif", condition: m[1].trim() });
+    branches.push({ type: "iif", condition: m[1].trim(), line: offsetToLine(m.index) });
   }
 
   return branches;
@@ -507,15 +523,31 @@ export function extractBranches(sql) {
 const SQL_KEYWORDS = new Set(["and","or","not","is","null","in","between","like","true","false",
   "then","else","end","case","when","as","on","from","where","select","join","left","right","inner",
   "coalesce","lower","upper","trim","cast","nullif","ifnull","date_trunc","date_part","extract",
-  "count","sum","avg","min","max","length","substr","substring","replace","concat","round","floor","ceil","abs"]);
+  "count","sum","avg","min","max","length","substr","substring","replace","concat","round","floor","ceil","abs",
+  "current_date","current_timestamp","current_time","now","today","year","month","day","hour","minute","second",
+  "date","timestamp","interval","format","parse_date","parse_timestamp","date_add","date_sub","date_diff",
+  "datetime","time","generate_date_array","generate_timestamp_array","safe_cast","if","iif","row_number","rank",
+  "dense_rank","over","partition","by","order","asc","desc","rows","range","unbounded","preceding","following"]);
 
 function extractConditionColumns(condition) {
   const cleaned = condition
     .replace(/'[^']*'/g, "")
-    .replace(/\b\d+\.?\d*\b/g, "");
-  return [...new Set([...cleaned.matchAll(/\b([a-z_]\w*)\b/gi)]
-    .map(m => m[1].toLowerCase())
-    .filter(w => !SQL_KEYWORDS.has(w)))];
+    .replace(/\b\d+\.?\d*\b/g, "")
+    .replace(/\b[a-z_]\w*\s*\(/gi, "("); // remove function calls (word followed by parenthesis)
+  const cols = [];
+  let allQualified = true; // true if every column is table.column qualified
+  let hasColumns = false;
+  // Prefer table.column pattern — extract just the column part
+  for (const m of cleaned.matchAll(/\b[a-z_]\w*\.([a-z_]\w*)\b/gi)) {
+    const col = m[1].toLowerCase();
+    if (!SQL_KEYWORDS.has(col)) { cols.push(col); hasColumns = true; }
+  }
+  // Standalone identifiers (not preceded by dot, not followed by dot)
+  for (const m of cleaned.matchAll(/(?<!\.)(?<!\w)\b([a-z_]\w*)\b(?!\.)/gi)) {
+    const w = m[1].toLowerCase();
+    if (!SQL_KEYWORDS.has(w) && !cols.includes(w)) { cols.push(w); hasColumns = true; allQualified = false; }
+  }
+  return { cols: [...new Set(cols)], allQualified: hasColumns && allQualified };
 }
 
 export function analyzeBranchCoverage(branches, givenRows) {
@@ -533,7 +565,7 @@ export function analyzeBranchCoverage(branches, givenRows) {
   }
 
   return branches.map(b => {
-    const cols = extractConditionColumns(b.condition);
+    const { cols, allQualified } = extractConditionColumns(b.condition);
     const referencedInGiven = cols.some(c => givenCols.has(c));
 
     // For CASE WHEN col = 'value', check if value appears in given rows
@@ -554,8 +586,11 @@ export function analyzeBranchCoverage(branches, givenRows) {
     // All matched patterns must be satisfied; if none matched, column presence is enough
     const valueCovered = referencedInGiven && (checks.length ? checks.every(Boolean) : true);
 
-    const covered = b.type === "case_else" ? false : valueCovered;
-    const coverageNote = b.type === "case_else" ? "ELSE reachability not analysed"
+    // Table-qualified columns (cte.col) not in given → intermediate CTE column, not testable via input
+    const notApplicable = allQualified && !referencedInGiven;
+    const covered = notApplicable ? true : b.type === "case_else" ? false : valueCovered;
+    const coverageNote = notApplicable ? "n/a (intermediate column)"
+      : b.type === "case_else" ? "ELSE reachability not analysed"
       : !referencedInGiven ? "column not in given rows"
       : valueCovered ? "possibly covered" : "value not found in given rows";
 
@@ -641,6 +676,7 @@ export function parseFile(content, filename) {
     metrics = extractMetrics(parsed);
   }
   tests.forEach((t) => (t.sourceFile = filename));
+  coverage.forEach((c) => (c.sourceFile = filename));
   semanticModels.forEach((sm) => (sm.sourceFile = filename));
   metrics.forEach((mt) => (mt.sourceFile = filename));
   return { tests, coverage, columnMeta, semanticModels, metrics, modelDescriptions };
