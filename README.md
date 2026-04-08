@@ -4,6 +4,24 @@ A tool to visualize dbt test definitions (unit test / schema test / data test / 
 
 **[Demo](https://connavy.github.io/dbt-test-reviewer/)** | [日本語](./README.ja.md)
 
+## Concept
+
+### Humans review logic. Agents catch bugs.
+
+In dbt code review, **humans** should focus on what they're best at — verifying business logic, evaluating test case relevance, and agreeing on data contracts. **AI agents** handle the mechanical work: detecting bugs, enforcing conventions, and generating tests for uncovered branches.
+
+This tool bridges the gap: it visualizes test definitions so humans can quickly assess "is the right thing being tested?" without parsing raw YAML/SQL.
+
+### Coverage = explicit decisions, not just test count
+
+100% coverage doesn't mean "every column has a test." It means **every column has an explicit decision** about testing:
+
+- Test defined → **Tested**
+- `meta: { no_test: true, reason: "..." }` → **Excluded** (intentionally, with documented reason)
+- Nothing → **Untested** (needs review)
+
+This follows the same structure as accepted risk in security reviews. The goal is zero "untested" columns — not zero columns without tests.
+
 ## Quick Start
 
 ```bash
