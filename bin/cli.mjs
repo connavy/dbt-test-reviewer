@@ -392,6 +392,7 @@ ${BOLD}dbt-test-reviewer${RESET} — Visualize dbt test input/output for review
 ${BOLD}Usage:${RESET}
   dbt-test-review preview [path...]    Show tests in terminal
   dbt-test-review serve [options]      Start local preview server (full UI)
+  dbt-test-review export [path...]     Export static HTML
   dbt-test-review markdown [path...]   Output Markdown (for CI)
   dbt-test-review demo [options]       Generate static demo page
 
@@ -404,6 +405,9 @@ ${BOLD}Commands:${RESET}
             Options: --port, -p <num>  Port (default: 3456)
                      --dir, -d <path>  Directory (default: .)
 
+  ${CYAN}export${RESET}    Export self-contained HTML for sharing
+            Options: --out, -o <file>  Output file (default: dbt-test-review.html)
+
   ${CYAN}markdown${RESET}  Output Markdown to stdout
 
   ${CYAN}demo${RESET}      Generate static HTML demo page with sample data
@@ -415,6 +419,12 @@ ${BOLD}Examples:${RESET}
 
   ${DIM}# Preview in terminal${RESET}
   dbt-test-review preview models/staging/schema.yml
+
+  ${DIM}# Export static HTML for sharing${RESET}
+  dbt-test-review export -o review.html
+
+  ${DIM}# Export only PR changed files${RESET}
+  gh pr diff 123 --name-only | xargs dbt-test-review export -o review.html
 
   ${DIM}# Generate Markdown for CI${RESET}
   dbt-test-review markdown > review.md
@@ -467,6 +477,63 @@ else if (command === "serve") {
 else if (command === "markdown") {
   const paths = args.slice(1).filter(a => !a.startsWith("-"));
   outputMarkdown(paths.length ? resolve(paths[0]) : resolve("."), paths.slice(1));
+}
+
+else if (command === "export") {
+  const outIdx = args.indexOf("--out") !== -1 ? args.indexOf("--out") : args.indexOf("-o");
+  const outFile = resolve(outIdx !== -1 ? (args[outIdx + 1] || "dbt-test-review.html") : "dbt-test-review.html");
+  const optionValueIndices = new Set();
+  if (outIdx !== -1) optionValueIndices.add(outIdx + 1);
+  const paths = args.slice(1).filter((a, i) => !a.startsWith("-") && !optionValueIndices.has(i + 1));
+  try {
+    // Resolve files: support both directories and individual files (like xargs)
+    const inputs = paths.length ? paths : ["."];
+    const allFiles = [];
+    for (const p of inputs) {
+      const resolved = resolve(p);
+      const stat = statSync(resolved, { throwIfNoEntry: false });
+      if (!stat) { process.stderr.write(`Warning: not found: ${p}\n`); continue; }
+      if (stat.isDirectory()) { allFiles.push(...findTestFiles(resolved)); }
+      else { allFiles.push(resolved); }
+    }
+    // Use loadAll-compatible processing
+    const baseDir = resolve(".");
+    const allTests = [], cteResults = {}, allCoverage = [], allColumnMeta = {}, allSemanticModels = [], allMetrics = [], allModelDescriptions = {};
+    const sqlByModel = {}, fileContents = {};
+    for (const f of allFiles) {
+      try {
+        const content = readFileSync(f, "utf-8");
+        const rel = f.replace(baseDir + "/", "");
+        fileContents[rel] = content;
+        const { tests, coverage, columnMeta, semanticModels, metrics, modelDescriptions } = parseFile(content, rel);
+        allTests.push(...tests);
+        allCoverage.push(...coverage);
+        Object.assign(allColumnMeta, columnMeta);
+        Object.assign(allModelDescriptions, modelDescriptions || {});
+        allSemanticModels.push(...semanticModels);
+        allMetrics.push(...(metrics || []));
+        if (extname(f).toLowerCase() === ".sql") {
+          const cte = parseCTEs(content);
+          if (cte.ctes.length) cteResults[rel] = cte;
+          const modelName = rel.split("/").pop().replace(/\.sql$/i, "");
+          sqlByModel[modelName] = content;
+        }
+      } catch (e) { process.stderr.write(`Skip ${f}: ${e.message}\n`); }
+    }
+    for (const t of allTests) {
+      if (t.type === "unit" && t.model && sqlByModel[t.model]) {
+        const branches = extractBranches(sqlByModel[t.model]);
+        const allGivenRows = t.given.flatMap(g => g.rows || []);
+        t.branchAnalysis = analyzeBranchCoverage(branches, allGivenRows);
+      }
+    }
+    const semanticWarnings = crossReferenceSemanticCoverage(allSemanticModels, allCoverage);
+    const data = { allTests, cteResults, coverageData: allCoverage, columnMeta: allColumnMeta, modelDescriptions: allModelDescriptions, semanticModels: allSemanticModels, metrics: allMetrics, semanticWarnings, fileContents, fileCount: allFiles.length };
+    const html = buildFullHTML(data);
+    writeFileSync(outFile, html, "utf-8");
+    log(`${GREEN}${BOLD}\u2713${RESET} Exported: ${BOLD}${outFile}${RESET}`);
+    log(`  ${DIM}${data.allTests.length} tests, ${data.coverageData.length} models${RESET}`);
+  } catch (e) { error(e.message); process.exit(1); }
 }
 
 else if (command === "demo") {
