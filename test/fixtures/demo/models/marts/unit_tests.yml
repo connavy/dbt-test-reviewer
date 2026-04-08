@@ -1,0 +1,15 @@
+unit_tests:
+  - name: test_order_total_calculation
+    model: fct_orders
+    description: "Verify that order total = qty * unit_price with discount applied"
+    given:
+      - input: ref('stg_orders')
+        rows:
+          - {order_id: 1, customer_id: 101, qty: 3, unit_price: 29.99, discount: 0.1, status: shipped}
+          - {order_id: 2, customer_id: 102, qty: 1, unit_price: 99.00, discount: null, status: pending}
+          - {order_id: 3, customer_id: 101, qty: 2, unit_price: 15.50, discount: 0.0, status: returned}
+    expect:
+      rows:
+        - {order_id: 1, total: 80.97}
+        - {order_id: 2, total: 99.00}
+        - {order_id: 3, total: 31.00}

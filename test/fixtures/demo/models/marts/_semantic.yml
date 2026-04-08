@@ -1,0 +1,30 @@
+semantic_models:
+  - name: orders_semantic
+    model: ref('fct_orders')
+    measures:
+      - name: total_revenue
+        agg: sum
+        expr: total
+        description: "Total revenue"
+      - name: order_count
+        agg: count
+        expr: order_id
+        description: "Number of orders"
+      - name: avg_discount
+        agg: average
+        expr: discount
+        description: "Average discount rate"
+    dimensions:
+      - name: order_date
+        type: time
+        expr: order_date
+      - name: status
+        type: categorical
+        expr: status
+    entities:
+      - name: order
+        type: primary
+        expr: order_id
+      - name: customer
+        type: foreign
+        expr: customer_id

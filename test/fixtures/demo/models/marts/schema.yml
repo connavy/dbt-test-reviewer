@@ -1,0 +1,73 @@
+models:
+  - name: fct_orders
+    description: "Fact table for orders"
+    columns:
+      - name: order_id
+        description: "Surrogate key"
+        data_type: integer
+        tests:
+          - unique
+          - not_null
+      - name: customer_id
+        description: "FK to dim_customers"
+        data_type: integer
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_customers')
+              field: customer_id
+      - name: order_date
+        description: "Date the order was placed"
+        data_type: date
+        tests:
+          - not_null
+      - name: status
+        description: "Order fulfillment status"
+        data_type: varchar
+        tests:
+          - accepted_values:
+              values: [pending, shipped, delivered, returned, cancelled]
+      - name: total
+        description: "Calculated order total"
+        data_type: numeric
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              inclusive: true
+      - name: discount
+        description: "Applied discount rate"
+        data_type: numeric
+      - name: internal_memo
+        description: "Internal processing note"
+        data_type: varchar
+        meta:
+          no_test: true
+          reason: "Internal field, not exposed in semantic layer"
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [order_id, order_date]
+
+  - name: dim_customers
+    description: "Customer dimension"
+    columns:
+      - name: customer_id
+        description: "Primary key"
+        data_type: integer
+        tests:
+          - unique
+          - not_null
+      - name: customer_name
+        description: "Full name"
+        data_type: varchar
+        tests:
+          - not_null
+      - name: email
+        description: "Contact email"
+        data_type: varchar
+        tests:
+          - not_null
+          - unique
+      - name: signup_date
+        description: "Registration date"
+        data_type: date
