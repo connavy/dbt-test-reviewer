@@ -500,57 +500,59 @@ function init() {
     else if (ctx.dir) parts.push('\u2014 ' + ctx.dir.split('/').slice(-2).join('/'));
     if (parts.length) hc.textContent = parts.join(' ');
   }
-  DATA.allTests.forEach(t => {
+  initReviewKeys(DATA);
+  if (DATA.parseErrors && DATA.parseErrors.length) {
+    const si2 = document.getElementById('status-indicator');
+    if (si2) si2.innerHTML += ' <span style="color:var(--rd);font-size:11px">\u26A0 ' + DATA.parseErrors.length + ' file(s) failed to parse</span>';
+  }
+  render(); renderSidebar(); poll();
+}
+
+function initReviewKeys(data) {
+  data.allTests.forEach(t => {
     const k = reviewKey(t);
     if (!reviews[k]) { reviews[k] = 'pending'; comments[k] = ''; }
   });
-  if (DATA.coverageData) {
-    DATA.coverageData.forEach(cov => {
+  if (data.coverageData) {
+    data.coverageData.forEach(cov => {
       cov.columns.filter(c => c.status === 'untested' || c.status === 'excluded').forEach(c => {
         const k = 'col:' + cov.model + ':' + c.name;
         if (!reviews[k]) { reviews[k] = 'pending'; comments[k] = ''; }
       });
     });
   }
-  if (DATA.semanticModels) {
-    DATA.semanticModels.forEach(sm => {
+  if (data.semanticModels) {
+    data.semanticModels.forEach(sm => {
       const k = 'semantic:' + sm.name + ':' + sm.modelRef;
       if (!reviews[k]) { reviews[k] = 'pending'; comments[k] = ''; }
     });
   }
-  render(); renderSidebar(); poll();
 }
 
+let pollFailCount = 0;
 async function poll() {
   if (DATA.demoMode) return;
   try {
     const r = await fetch('/api/data');
     if (!r.ok) throw new Error('Server returned ' + r.status);
     const d = await r.json();
+    if (pollFailCount > 0) {
+      pollFailCount = 0;
+      const si = document.getElementById('status-indicator');
+      if (si) si.innerHTML = '<span class="live-dot"></span>Live \u2014 Auto-refreshes on file changes';
+    }
     if (JSON.stringify(d.allTests) !== JSON.stringify(DATA.allTests)) {
       DATA = d;
-      d.allTests.forEach(t => {
-        const k = reviewKey(t);
-        if (!reviews[k]) { reviews[k] = 'pending'; comments[k] = ''; }
-      });
-      if (DATA.coverageData) {
-        DATA.coverageData.forEach(cov => {
-          cov.columns.filter(c => c.status === 'untested' || c.status === 'excluded').forEach(c => {
-            const k = 'col:' + cov.model + ':' + c.name;
-            if (!reviews[k]) { reviews[k] = 'pending'; comments[k] = ''; }
-          });
-        });
-      }
-      if (DATA.semanticModels) {
-        DATA.semanticModels.forEach(sm => {
-          const k = 'semantic:' + sm.name + ':' + sm.modelRef;
-          if (!reviews[k]) { reviews[k] = 'pending'; comments[k] = ''; }
-        });
-      }
+      initReviewKeys(DATA);
       render(); renderSidebar();
     }
   } catch (e) {
+    pollFailCount++;
     console.warn('Poll failed:', e.message);
+    if (pollFailCount >= 3) {
+      const si = document.getElementById('status-indicator');
+      if (si) si.innerHTML = '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--rd);margin-right:6px"></span>Disconnected \u2014 Server unreachable';
+    }
   }
   setTimeout(poll, POLL_INTERVAL);
 }

@@ -40,11 +40,12 @@ function findTestFiles(dir, patterns = []) {
   return files;
 }
 
-function loadAll(dir, patterns) {
-  const files = findTestFiles(dir, patterns);
+function loadAll(dir, patterns, fileList) {
+  const files = fileList || findTestFiles(dir, patterns);
   const allTests = [], cteResults = {}, allCoverage = [], allColumnMeta = {}, allSemanticModels = [], allMetrics = [], allModelDescriptions = {};
   const sqlByModel = {}; // model name -> SQL content for branch analysis
   const fileContents = {}; // filename -> raw content
+  const parseErrors = [];
   for (const f of files) {
     try {
       const content = readFileSync(f, "utf-8");
@@ -64,7 +65,18 @@ function loadAll(dir, patterns) {
         const modelName = rel.split("/").pop().replace(/\.sql$/i, "");
         sqlByModel[modelName] = { content, path: rel };
       }
-    } catch (e) { process.stderr.write(`Skip ${f}: ${e.message}\n`); }
+    } catch (e) {
+      if (e.code === 'ENOENT' || e.code === 'EACCES' || e.code === 'EISDIR') {
+        process.stderr.write(`Skip ${f}: ${e.message}\n`);
+      } else {
+        process.stderr.write(`${RED}ERROR${RESET} parsing ${f}: ${e.message}\n${e.stack}\n`);
+        parseErrors.push(f);
+      }
+    }
+  }
+  if (parseErrors.length) {
+    process.stderr.write(`\n${YELLOW}WARNING${RESET}: ${parseErrors.length} file(s) failed to parse:\n`);
+    parseErrors.forEach(f => process.stderr.write(`  - ${f}\n`));
   }
   // Branch analysis: attach to unit tests
   for (const t of allTests) {
@@ -77,9 +89,16 @@ function loadAll(dir, patterns) {
   }
   const semanticWarnings = crossReferenceSemanticCoverage(allSemanticModels, allCoverage);
   let gitBranch = null;
-  try { gitBranch = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: dir, stdio: ['pipe', 'pipe', 'ignore'] }).toString().trim(); } catch {}
+  try {
+    gitBranch = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: dir, stdio: ['pipe', 'pipe', 'ignore'] }).toString().trim();
+  } catch (e) {
+    // exit code 128 = not a git repo (expected); other failures warrant warning
+    if (e.status !== 128) {
+      process.stderr.write(`Warning: git branch detection failed: ${e.message}\n`);
+    }
+  }
   const context = { dir: resolve(dir), gitBranch };
-  return { allTests, cteResults, coverageData: allCoverage, columnMeta: allColumnMeta, modelDescriptions: allModelDescriptions, semanticModels: allSemanticModels, metrics: allMetrics, semanticWarnings, fileContents, fileCount: files.length, context };
+  return { allTests, cteResults, coverageData: allCoverage, columnMeta: allColumnMeta, modelDescriptions: allModelDescriptions, semanticModels: allSemanticModels, metrics: allMetrics, semanticWarnings, fileContents, fileCount: files.length, parseErrors, context };
 }
 
 /* ═══════════════════════════════════════════════
@@ -395,40 +414,8 @@ else if (command === "export") {
       if (stat.isDirectory()) { allFiles.push(...findTestFiles(resolved)); }
       else { allFiles.push(resolved); }
     }
-    // Use loadAll-compatible processing
     const baseDir = resolve(".");
-    const allTests = [], cteResults = {}, allCoverage = [], allColumnMeta = {}, allSemanticModels = [], allMetrics = [], allModelDescriptions = {};
-    const sqlByModel = {}, fileContents = {};
-    for (const f of allFiles) {
-      try {
-        const content = readFileSync(f, "utf-8");
-        const rel = f.replace(baseDir + "/", "");
-        fileContents[rel] = content;
-        const { tests, coverage, columnMeta, semanticModels, metrics, modelDescriptions } = parseFile(content, rel);
-        allTests.push(...tests);
-        allCoverage.push(...coverage);
-        Object.assign(allColumnMeta, columnMeta);
-        Object.assign(allModelDescriptions, modelDescriptions || {});
-        allSemanticModels.push(...semanticModels);
-        allMetrics.push(...(metrics || []));
-        if (extname(f).toLowerCase() === ".sql") {
-          const cte = parseCTEs(content);
-          if (cte.ctes.length) cteResults[rel] = cte;
-          const modelName = rel.split("/").pop().replace(/\.sql$/i, "");
-          sqlByModel[modelName] = { content, path: rel };
-        }
-      } catch (e) { process.stderr.write(`Skip ${f}: ${e.message}\n`); }
-    }
-    for (const t of allTests) {
-      if (t.type === "unit" && t.model && sqlByModel[t.model]) {
-        const branches = extractBranches(sqlByModel[t.model].content);
-        const allGivenRows = t.given.flatMap(g => g.rows || []);
-        t.branchAnalysis = analyzeBranchCoverage(branches, allGivenRows);
-        t.branchSourceFile = sqlByModel[t.model].path;
-      }
-    }
-    const semanticWarnings = crossReferenceSemanticCoverage(allSemanticModels, allCoverage);
-    const data = { allTests, cteResults, coverageData: allCoverage, columnMeta: allColumnMeta, modelDescriptions: allModelDescriptions, semanticModels: allSemanticModels, metrics: allMetrics, semanticWarnings, fileContents, fileCount: allFiles.length };
+    const data = loadAll(baseDir, null, allFiles);
     const html = buildFullHTML(data);
     writeFileSync(outFile, html, "utf-8");
     log(`${GREEN}${BOLD}\u2713${RESET} Exported: ${BOLD}${outFile}${RESET}`);

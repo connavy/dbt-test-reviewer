@@ -91,6 +91,7 @@ export function parseYaml(text) {
   function parseNode(mi, depth = 0) {
     if (depth > MAX_DEPTH) {
       // Skip remaining lines at this indent level to avoid infinite recursion
+      process.stderr?.write?.(`Warning: YAML depth limit (${MAX_DEPTH}) exceeded, data may be truncated\n`);
       while (pos < lines.length && peek() && peek().indent >= mi) pos++;
       return undefined;
     }
@@ -400,7 +401,7 @@ function resolveSemanticModel(smList, measureName) {
     const measures = Array.isArray(sm.measures) ? sm.measures : [];
     if (measures.some(m => (m.name || '') === measureName)) return sm.name || null;
   }
-  return smList[0].name || null; // fallback to first
+  return null; // no matching semantic model found for this measure
 }
 
 export function extractMetrics(parsed) {
