@@ -6,6 +6,7 @@ on:
     paths:
       - "src/template.html"
       - "bin/cli.mjs"
+      - "test/fixtures/demo/**"
 
 permissions:
   contents: write
