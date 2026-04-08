@@ -4,19 +4,30 @@
 /* ═══════════════════════════════════════════════
    YAML Parser (recursive descent, dbt subset)
    ═══════════════════════════════════════════════ */
+
+// Split on commas while respecting quoted strings and nested brackets
+function splitRespectingQuotes(s) {
+  const parts = [];
+  let current = '', depth = 0, inQ = false, q = '';
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (!inQ && (c === '"' || c === "'")) { inQ = true; q = c; current += c; }
+    else if (inQ && c === q) { inQ = false; current += c; }
+    else if (!inQ && "{[(".includes(c)) { depth++; current += c; }
+    else if (!inQ && "}])".includes(c)) { depth--; current += c; }
+    else if (!inQ && c === ',' && depth === 0) { parts.push(current.trim()); current = ''; }
+    else { current += c; }
+  }
+  if (current.trim()) parts.push(current.trim());
+  return parts;
+}
+
 function parseInlineObj(s) {
   s = s.trim();
   if (s.startsWith("{") && s.endsWith("}")) s = s.slice(1, -1).trim();
   if (!s) return {};
   const result = {};
-  let depth = 0, current = "", pairs = [];
-  for (const ch of s) {
-    if ("{[(".includes(ch)) depth++;
-    if ("}])".includes(ch)) depth--;
-    if (ch === "," && depth === 0) { pairs.push(current.trim()); current = ""; }
-    else current += ch;
-  }
-  if (current.trim()) pairs.push(current.trim());
+  const pairs = splitRespectingQuotes(s);
   for (const p of pairs) {
     const ci = p.indexOf(":");
     if (ci === -1) continue;
@@ -38,16 +49,7 @@ function parseInlineArr(s) {
   s = s.trim();
   if (s.startsWith("[") && s.endsWith("]")) s = s.slice(1, -1).trim();
   if (!s) return [];
-  const items = [];
-  let depth = 0, cur = "";
-  for (const ch of s) {
-    if ("{[".includes(ch)) depth++;
-    if ("}]".includes(ch)) depth--;
-    if (ch === "," && depth === 0) { items.push(cur.trim()); cur = ""; }
-    else cur += ch;
-  }
-  if (cur.trim()) items.push(cur.trim());
-  return items.map(parseScalar);
+  return splitRespectingQuotes(s).map(parseScalar);
 }
 
 function stripInlineComment(s) {
@@ -82,7 +84,7 @@ export function parseYaml(text) {
   for (const raw of text.split("\n")) {
     const t = raw.replace(/\s+$/, "");
     if (!t || t.trim().startsWith("#")) continue;
-    lines.push({ indent: t.search(/\S/), content: t.trim() });
+    lines.push({ indent: t.search(/\S/), content: t.trim(), raw: t });
   }
   let pos = 0;
   const peek = () => (pos < lines.length ? lines[pos] : null);
@@ -118,10 +120,14 @@ export function parseYaml(text) {
         // Multiline block scalar (| literal, > folded, with optional chomping indicator)
         const folded = rest.startsWith(">");
         const blockLines = [];
+        let baseIndent = -1;
         while (pos < lines.length) {
           const n = peek();
           if (!n || n.indent <= mi) break;
-          blockLines.push(n.content);
+          if (baseIndent < 0) baseIndent = n.indent;
+          // Preserve relative indentation using raw text
+          const line = n.raw !== undefined ? n.raw.slice(Math.min(baseIndent, n.raw.search(/\S|$/))) : n.content;
+          blockLines.push(line);
           pos++;
         }
         r[key] = folded ? blockLines.join(" ") : blockLines.join("\n");
@@ -578,6 +584,24 @@ export function analyzeBranchCoverage(branches, givenRows) {
         const val = eqMatch[2].toLowerCase();
         checks.push(givenValues[col]?.has(val) || false);
       }
+      if (!eqMatch) {
+        // Double-quoted string: col = "value"
+        const dqMatch = b.condition.match(/(\w+)\s*=\s*"([^"]*)"/i);
+        if (dqMatch) {
+          const col = dqMatch[1].toLowerCase();
+          const val = dqMatch[2].toLowerCase();
+          checks.push(givenValues[col]?.has(val) || false);
+        }
+      }
+      if (!eqMatch) {
+        // Numeric/boolean: col = 123 or col = true
+        const numMatch = b.condition.match(/(\w+)\s*=\s*(\d+(?:\.\d+)?|true|false)\b/i);
+        if (numMatch) {
+          const col = numMatch[1].toLowerCase();
+          const val = numMatch[2].toLowerCase();
+          checks.push(givenValues[col]?.has(val) || false);
+        }
+      }
       const nullMatch = b.condition.match(/(\w+)\s+IS\s+NULL/i);
       if (nullMatch) {
         const col = nullMatch[1].toLowerCase();
@@ -639,12 +663,16 @@ export function parseCTEs(sql) {
   }
   const finalSelect = cleaned.slice(pos).trim();
   const cteNames = ctes.map((c) => c.name.toLowerCase());
+  // Strip string literals to avoid false-positive CTE dependency matches
+  const stripStrings = (s) => s.replace(/'[^']*'/g, "''").replace(/"[^"]*"/g, '""');
   for (const c of ctes) {
+    const bodyForDeps = stripStrings(c.body);
     c.deps = cteNames.filter(
-      (n) => n !== c.name.toLowerCase() && new RegExp(`\\b${n}\\b`, "i").test(c.body)
+      (n) => n !== c.name.toLowerCase() && new RegExp(`\\b${n}\\b`, "i").test(bodyForDeps)
     );
   }
-  const finalDeps = cteNames.filter((n) => new RegExp(`\\b${n}\\b`, "i").test(finalSelect));
+  const finalForDeps = stripStrings(finalSelect);
+  const finalDeps = cteNames.filter((n) => new RegExp(`\\b${n}\\b`, "i").test(finalForDeps));
   return { ctes, finalSelect, finalDeps };
 }
 

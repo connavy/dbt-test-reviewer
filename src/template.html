@@ -541,7 +541,7 @@ async function poll() {
       const si = document.getElementById('status-indicator');
       if (si) si.innerHTML = '<span class="live-dot"></span>Live \u2014 Auto-refreshes on file changes';
     }
-    if (JSON.stringify(d.allTests) !== JSON.stringify(DATA.allTests)) {
+    if (JSON.stringify(d) !== JSON.stringify(DATA)) {
       DATA = d;
       initReviewKeys(DATA);
       render(); renderSidebar();
