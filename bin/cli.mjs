@@ -61,16 +61,17 @@ function loadAll(dir, patterns) {
         if (cte.ctes.length) cteResults[rel] = cte;
         // Map model name (filename without ext) -> SQL for branch analysis
         const modelName = rel.split("/").pop().replace(/\.sql$/i, "");
-        sqlByModel[modelName] = content;
+        sqlByModel[modelName] = { content, path: rel };
       }
     } catch (e) { process.stderr.write(`Skip ${f}: ${e.message}\n`); }
   }
   // Branch analysis: attach to unit tests
   for (const t of allTests) {
     if (t.type === "unit" && t.model && sqlByModel[t.model]) {
-      const branches = extractBranches(sqlByModel[t.model]);
+      const branches = extractBranches(sqlByModel[t.model].content);
       const allGivenRows = t.given.flatMap(g => g.rows || []);
       t.branchAnalysis = analyzeBranchCoverage(branches, allGivenRows);
+      t.branchSourceFile = sqlByModel[t.model].path;
     }
   }
   const semanticWarnings = crossReferenceSemanticCoverage(allSemanticModels, allCoverage);
@@ -516,15 +517,16 @@ else if (command === "export") {
           const cte = parseCTEs(content);
           if (cte.ctes.length) cteResults[rel] = cte;
           const modelName = rel.split("/").pop().replace(/\.sql$/i, "");
-          sqlByModel[modelName] = content;
+          sqlByModel[modelName] = { content, path: rel };
         }
       } catch (e) { process.stderr.write(`Skip ${f}: ${e.message}\n`); }
     }
     for (const t of allTests) {
       if (t.type === "unit" && t.model && sqlByModel[t.model]) {
-        const branches = extractBranches(sqlByModel[t.model]);
+        const branches = extractBranches(sqlByModel[t.model].content);
         const allGivenRows = t.given.flatMap(g => g.rows || []);
         t.branchAnalysis = analyzeBranchCoverage(branches, allGivenRows);
+        t.branchSourceFile = sqlByModel[t.model].path;
       }
     }
     const semanticWarnings = crossReferenceSemanticCoverage(allSemanticModels, allCoverage);
