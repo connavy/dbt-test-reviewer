@@ -5,6 +5,7 @@ import { readFileSync, writeFileSync, readdirSync, statSync, mkdirSync, watch } 
 import { join, extname, resolve, dirname } from "path";
 import { fileURLToPath } from "url";
 import { createServer } from "http";
+import { execFileSync } from "child_process";
 import { parseFile, parseCTEs, testsToMarkdown, extractCoverage, extractColumnMeta, extractModelDescriptions, crossReferenceSemanticCoverage, extractBranches, analyzeBranchCoverage } from "../src/parser.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -75,7 +76,10 @@ function loadAll(dir, patterns) {
     }
   }
   const semanticWarnings = crossReferenceSemanticCoverage(allSemanticModels, allCoverage);
-  return { allTests, cteResults, coverageData: allCoverage, columnMeta: allColumnMeta, modelDescriptions: allModelDescriptions, semanticModels: allSemanticModels, metrics: allMetrics, semanticWarnings, fileContents, fileCount: files.length };
+  let gitBranch = null;
+  try { gitBranch = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: dir, stdio: ['pipe', 'pipe', 'ignore'] }).toString().trim(); } catch {}
+  const context = { dir: resolve(dir), gitBranch };
+  return { allTests, cteResults, coverageData: allCoverage, columnMeta: allColumnMeta, modelDescriptions: allModelDescriptions, semanticModels: allSemanticModels, metrics: allMetrics, semanticWarnings, fileContents, fileCount: files.length, context };
 }
 
 /* ═══════════════════════════════════════════════
