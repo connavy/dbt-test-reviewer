@@ -274,12 +274,13 @@ function buildDemoData() {
           { order_id: 2, total: 99.00 },
           { order_id: 3, total: 31.00 },
         ],
+        branchSourceFile: "models/marts/fct_orders.sql",
         branchAnalysis: [
-          { type: "case_when", condition: "status = 'returned'", columns: ["status"], covered: true, coverageNote: "possibly covered" },
-          { type: "case_when", condition: "status = 'pending'", columns: ["status"], covered: true, coverageNote: "possibly covered" },
-          { type: "case_when", condition: "discount IS NULL", columns: ["discount"], covered: true, coverageNote: "possibly covered" },
-          { type: "case_else", condition: "ELSE", columns: [], covered: false, coverageNote: "ELSE reachability not analysed" },
-          { type: "coalesce", condition: "discount IS NULL", columns: ["discount"], covered: true, coverageNote: "possibly covered" },
+          { type: "case_when", condition: "status = 'returned'", columns: ["status"], covered: true, coverageNote: "possibly covered", line: 12 },
+          { type: "case_when", condition: "status = 'pending'", columns: ["status"], covered: true, coverageNote: "possibly covered", line: 14 },
+          { type: "case_when", condition: "discount IS NULL", columns: ["discount"], covered: true, coverageNote: "possibly covered", line: 18 },
+          { type: "case_else", condition: "ELSE", columns: [], covered: false, coverageNote: "ELSE reachability not analysed", line: 20 },
+          { type: "coalesce", condition: "discount IS NULL", columns: ["discount"], covered: true, coverageNote: "possibly covered", line: 22 },
         ],
       },
       { type: "schema", name: "unique", model: "fct_orders", column: "order_id", description: "Surrogate key", data_type: "integer", config: {}, sourceFile: "models/marts/schema.yml" },
@@ -356,7 +357,18 @@ function buildDemoData() {
       { semanticModel: "orders_semantic", model: "fct_orders", kind: "measure", item: "avg_discount", column: "discount",
         detail: "agg: average", issue: "no_tests", hint: 'measure "avg_discount" (agg: average) references column "discount" which has no tests' },
     ],
+    cteResults: {
+      "models/marts/fct_orders.sql": {
+        ctes: [
+          { name: "stg_orders", body: "SELECT * FROM {{ ref('stg_orders') }}", deps: [], externalRefs: ["stg_orders"] },
+          { name: "calc_totals", body: "SELECT\n    order_id,\n    customer_id,\n    order_date,\n    status,\n    qty * unit_price AS subtotal,\n    COALESCE(discount, 0) AS discount_rate,\n    CASE\n        WHEN status = 'returned' THEN 0\n        WHEN status = 'pending' THEN qty * unit_price\n        ELSE qty * unit_price * (1 - COALESCE(discount, 0))\n    END AS total\nFROM stg_orders", deps: ["stg_orders"], externalRefs: [] },
+        ],
+        finalSelect: "SELECT\n    order_id,\n    customer_id,\n    order_date,\n    status,\n    total,\n    discount_rate AS discount\nFROM calc_totals",
+        finalDeps: ["calc_totals"],
+      },
+    },
     fileContents: {
+      "models/marts/fct_orders.sql": "WITH stg_orders AS (\n    SELECT * FROM {{ ref('stg_orders') }}\n),\n\ncalc_totals AS (\n    SELECT\n        order_id,\n        customer_id,\n        order_date,\n        status,\n        qty * unit_price AS subtotal,\n        COALESCE(discount, 0) AS discount_rate,\n        CASE\n            WHEN status = 'returned' THEN 0\n            WHEN status = 'pending' THEN qty * unit_price\n            ELSE qty * unit_price * (1 - COALESCE(discount, 0))\n        END AS total\n    FROM stg_orders\n)\n\nSELECT\n    order_id,\n    customer_id,\n    order_date,\n    status,\n    total,\n    discount_rate AS discount\nFROM calc_totals",
       "models/marts/unit_tests.yml": "unit_tests:\n  - name: test_order_total_calculation\n    model: fct_orders\n    description: \"Verify that order total = qty * unit_price with discount applied\"\n    given:\n      - input: ref('stg_orders')\n        rows:\n          - {order_id: 1, customer_id: 101, qty: 3, unit_price: 29.99, discount: 0.1, status: shipped}\n          - {order_id: 2, customer_id: 102, qty: 1, unit_price: 99.00, discount: null, status: pending}\n          - {order_id: 3, customer_id: 101, qty: 2, unit_price: 15.50, discount: 0.0, status: returned}\n    expect:\n      rows:\n        - {order_id: 1, total: 80.97}\n        - {order_id: 2, total: 99.00}\n        - {order_id: 3, total: 31.00}\n",
       "models/marts/schema.yml": "models:\n  - name: fct_orders\n    description: \"Fact table for orders\"\n    columns:\n      - name: order_id\n        description: \"Surrogate key\"\n        data_type: integer\n        tests:\n          - unique\n          - not_null\n      - name: customer_id\n        description: \"FK to dim_customers\"\n        data_type: integer\n        tests:\n          - not_null\n          - relationships:\n              to: ref('dim_customers')\n              field: customer_id\n      - name: order_date\n        description: \"Date the order was placed\"\n        data_type: date\n        tests:\n          - not_null\n      - name: status\n        description: \"Order fulfillment status\"\n        data_type: varchar\n        tests:\n          - accepted_values:\n              values: [pending, shipped, delivered, returned, cancelled]\n      - name: total\n        description: \"Calculated order total\"\n        data_type: numeric\n        tests:\n          - not_null\n          - dbt_utils.accepted_range:\n              min_value: 0\n              inclusive: true\n      - name: discount\n        description: \"Applied discount rate\"\n        data_type: numeric\n      - name: internal_memo\n        description: \"Internal processing note\"\n        data_type: varchar\n        meta:\n          no_test: true\n          reason: \"Internal field, not exposed in semantic layer\"\n    tests:\n      - dbt_utils.unique_combination_of_columns:\n          combination_of_columns: [order_id, order_date]\n\n  - name: dim_customers\n    description: \"Customer dimension\"\n    columns:\n      - name: customer_id\n        description: \"Primary key\"\n        data_type: integer\n        tests:\n          - unique\n          - not_null\n      - name: customer_name\n        description: \"Full name\"\n        data_type: varchar\n        tests:\n          - not_null\n      - name: email\n        description: \"Contact email\"\n        data_type: varchar\n        tests:\n          - not_null\n          - unique\n      - name: signup_date\n        description: \"Registration date\"\n        data_type: date\n",
       "tests/assert_no_orphan_orders.sql": "-- name: assert_no_orphan_orders\n-- description: All orders must have a valid customer\n\nWITH orders AS (\n    SELECT * FROM {{ ref('fct_orders') }}\n),\ncustomers AS (\n    SELECT * FROM {{ ref('dim_customers') }}\n)\n\nSELECT o.order_id\nFROM orders o\nLEFT JOIN customers c ON o.customer_id = c.customer_id\nWHERE c.customer_id IS NULL",
