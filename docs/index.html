@@ -58,6 +58,7 @@ html.light .sql-keyword{color:#cf222e}html.light .sql-string{color:#0a3069}html.
 .raw-btn{padding:3px 8px;border-radius:4px;font-size:11px;font-family:var(--fn);cursor:pointer;border:1px solid var(--bd);background:transparent;color:var(--txm);transition:all .15s}.raw-btn:hover{color:var(--tx);border-color:var(--txm)}.raw-btn.active{color:var(--cy);border-color:var(--cy);background:var(--cyb)}
 .raw-pre{margin:0;padding:18px;font-family:var(--fn);font-size:12px;color:var(--txd);line-height:1.6;overflow-x:auto;background:rgba(0,0,0,.15);white-space:pre-wrap;border-top:1px solid var(--bd)}
 .yaml-key{color:#ff7b72}.yaml-str{color:#a5d6ff}.yaml-comment{color:#5c6175;font-style:italic}.yaml-num{color:#79c0ff}.yaml-bool{color:#ff7b72;font-weight:600}.yaml-null{color:#ff7b72;font-style:italic}.yaml-anchor{color:#d2a8ff}
+html.light .yaml-key{color:#cf222e}html.light .yaml-str{color:#0a3069}html.light .yaml-comment{color:#6e7781}html.light .yaml-num{color:#0550ae}html.light .yaml-bool{color:#cf222e}html.light .yaml-null{color:#cf222e}html.light .yaml-anchor{color:#8250df}
 .export-panel{margin-top:24px;background:var(--sf);border-radius:10px;border:1px solid var(--bd);overflow:hidden}
 .export-head{padding:14px 18px;background:var(--sf2);border-bottom:1px solid var(--bd);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
 .export-body{padding:18px}
@@ -84,8 +85,8 @@ html.light .sql-keyword{color:#cf222e}html.light .sql-string{color:#0a3069}html.
 .no-test-guide{padding:8px 18px;font-size:12px;color:var(--txm);background:var(--orb);border-top:1px solid rgba(210,153,34,.15);line-height:1.6}
 .layout{display:flex;height:calc(100vh - 53px)}
 .sidebar{width:250px;min-width:150px;max-width:500px;background:var(--sf);border-right:1px solid var(--bd);overflow-y:auto;padding:12px 0;font-size:12px;font-family:var(--fn);position:relative;flex-shrink:0}
-.sidebar-resize{width:4px;cursor:col-resize;background:transparent;flex-shrink:0;transition:background .15s}
-.sidebar-resize:hover,.sidebar-resize.active{background:var(--bl)}
+.sidebar-resize,.panel-resize{width:4px;cursor:col-resize;background:transparent;flex-shrink:0;transition:background .15s}
+.sidebar-resize:hover,.sidebar-resize.active,.panel-resize:hover,.panel-resize.active{background:var(--bl)}
 .sidebar-header{padding:0 12px 8px;display:flex;align-items:center;justify-content:space-between}
 .sidebar-title{font-size:11px;font-weight:700;color:var(--txm);text-transform:uppercase;letter-spacing:.05em}
 .sidebar-all{padding:6px 12px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;border-radius:4px;margin:0 6px 4px;transition:background .1s}
@@ -122,11 +123,30 @@ html.light .sql-keyword{color:#cf222e}html.light .sql-string{color:#0a3069}html.
 .cte-card{background:var(--sf);border-radius:8px;border:1px solid var(--bd);overflow:hidden;margin-bottom:14px}
 .cte-head{padding:12px 18px;background:var(--sf2);border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none}
 .cte-body{padding:0;font-family:var(--fn);font-size:12px}
+.right-panel{width:0;overflow:hidden;background:var(--sf);border-left:1px solid var(--bd);transition:width .2s ease;flex-shrink:0;display:flex;flex-direction:column}
+.right-panel.dragging{transition:none}
+.right-panel.open{width:420px}
+.right-panel-header{padding:12px 16px;border-bottom:1px solid var(--bd);display:flex;align-items:center;justify-content:space-between;background:var(--sf2);flex-shrink:0}
+.right-panel-body{flex:1;overflow-y:auto}
+.cte-open-btn{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;font-family:var(--fn);cursor:pointer;border:1px solid var(--cy);background:var(--cyb);color:var(--cy);transition:all .15s;line-height:1.4}
+.cte-open-btn:hover{background:var(--cy);color:var(--bg)}
+@media(min-width:769px){
+.sidebar{transition:width .2s ease,min-width .2s ease,padding .2s ease,opacity .15s ease}
+.sidebar.collapsed{width:0!important;min-width:0!important;padding:0!important;overflow:hidden;opacity:0;border-right:none}
+.sidebar.collapsed+.sidebar-resize{display:none}
+}
+@media(max-width:768px){
+.right-panel{position:fixed;top:53px;right:0;bottom:0;z-index:100;width:0;max-width:100vw}
+.right-panel.open{width:100vw}
+}
 </style></head><body>
 <div class="header">
   <h1><button class="hamburger" id="hamburger-btn" onclick="toggleSidebar()">&#9776;</button><span class="icon">T</span> dbt Test Reviewer</h1>
-  <div style="display:flex;align-items:center;gap:10px">
+  <div style="display:flex;align-items:center;gap:6px">
     <div style="font-size:12px;color:var(--txd)" id="status-indicator"></div>
+    <button class="theme-toggle" onclick="toggleSidebarCollapse()" title="Toggle sidebar (b)">&#9776;</button>
+    <button class="theme-toggle" onclick="var rp=document.getElementById('right-panel');if(rp.classList.contains('open')){closeRightPanel()}else{var f=Object.keys(DATA.cteResults||{})[0];if(f){openCTEPanel(f)}else{var s=Object.keys(DATA.fileContents||{})[0];if(s)openSourcePanel(s)}}" title="Toggle right panel (e)">&#9707;</button>
+    <button class="theme-toggle" onclick="var h=document.getElementById('kbd-help');h.style.display=h.style.display==='none'?'block':'none'" title="Keyboard shortcuts (?)">&#63;</button>
     <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" title="Toggle light/dark theme">&#9790;</button>
   </div>
 </div>
@@ -135,10 +155,13 @@ html.light .sql-keyword{color:#cf222e}html.light .sql-string{color:#0a3069}html.
   <div class="sidebar" id="sidebar"></div>
   <div class="sidebar-resize" id="sidebar-resize"></div>
   <div class="main" id="app"></div>
+  <div class="panel-resize" id="panel-resize"></div>
+  <div class="right-panel" id="right-panel"></div>
 </div>
 <div id="kbd-help" class="kbd-help" style="display:none">
 <kbd>j</kbd> / <kbd>k</kbd> Navigate cards<br>
 <kbd>1</kbd> OK &middot; <kbd>2</kbd> Needs Change &middot; <kbd>3</kbd> Pending<br>
+<kbd>b</kbd> Toggle sidebar &middot; <kbd>e</kbd> Toggle CTE panel<br>
 <kbd>?</kbd> or <kbd>/</kbd> Toggle this help
 </div>
 <script>
@@ -180,16 +203,50 @@ function getFileReviewStatus(tests) {
   return 'approved';
 }
 
+function getSemanticFileReviewStatus(smList) {
+  if (!smList || !smList.length) return null;
+  const statuses = new Set();
+  smList.forEach(sm => {
+    const k = 'semantic:' + sm.name + ':' + sm.modelRef;
+    statuses.add(reviews[k] || 'pending');
+  });
+  if (statuses.has('needs_change')) return 'needs_change';
+  if (statuses.has('pending')) return 'pending';
+  return 'approved';
+}
+
+function getSemanticFiles() {
+  const smFiles = {};
+  (DATA.semanticModels || []).forEach(sm => {
+    if (!sm.sourceFile) return;
+    if (!smFiles[sm.sourceFile]) smFiles[sm.sourceFile] = { models: [], metrics: [] };
+    smFiles[sm.sourceFile].models.push(sm);
+  });
+  (DATA.metrics || []).forEach(mt => {
+    if (!mt.sourceFile) return;
+    if (!smFiles[mt.sourceFile]) smFiles[mt.sourceFile] = { models: [], metrics: [] };
+    smFiles[mt.sourceFile].metrics.push(mt);
+  });
+  return smFiles;
+}
+
 function renderSidebar() {
   const tests = DATA.allTests;
   const files = getFileList(tests);
   const totalTests = tests.length;
+  const smFiles = getSemanticFiles();
+  const testPaths = new Set(files.map(f => f.path));
+  const semanticFileEntries = Object.entries(smFiles)
+    .filter(([path]) => !testPaths.has(path))
+    .sort(([a], [b]) => a.localeCompare(b));
+  const semanticItemCount = semanticFileEntries.reduce((sum, [, v]) => sum + v.models.length, 0);
+
   let h = '<div style="position:relative">';
   h += '<button class="sidebar-close" onclick="toggleSidebar()">\u2715</button>';
   h += '<div class="sidebar-header"><span class="sidebar-title">Files</span></div>';
   h += '<div class="sidebar-all' + (!selectedFile ? ' active' : '') + '" onclick="selectFile(null)">';
   h += '<span>All Files</span>';
-  h += '<span class="sidebar-count">' + totalTests + '</span>';
+  h += '<span class="sidebar-count">' + (totalTests + semanticItemCount) + '</span>';
   h += '</div>';
   h += '<div class="sidebar-sep"></div>';
   for (const file of files) {
@@ -228,6 +285,44 @@ function renderSidebar() {
       h += '</div>';
     }
   }
+  // Semantic YAML files (not already in test files)
+  if (semanticFileEntries.length > 0) {
+    h += '<div class="sidebar-sep"></div>';
+    for (const [path, smData] of semanticFileEntries) {
+      const parts = path.split('/');
+      const name = parts.pop();
+      const dir = parts.join('/');
+      const count = smData.models.length;
+      const status = getSemanticFileReviewStatus(smData.models);
+      const isActive = selectedFile === path;
+      const dotColor = status === 'approved' ? 'var(--ac)' : status === 'needs_change' ? 'var(--rd)' : status === 'pending' ? 'var(--or)' : '';
+      h += '<div class="sidebar-file' + (isActive ? ' active' : '') + '" onclick="selectFile(' + jsStr(path) + ')">';
+      h += '<div class="sidebar-file-info">';
+      if (dir) h += '<div class="sidebar-file-path">' + esc(dir) + '</div>';
+      h += '<div class="sidebar-file-name">';
+      h += '<span class="sidebar-file-ext" style="color:var(--cy);background:var(--cyb)">SM</span>';
+      h += esc(name);
+      h += '</div></div>';
+      h += '<div class="sidebar-right">';
+      if (dotColor) h += '<span class="sidebar-dot" style="background:' + dotColor + '"></span>';
+      h += '<span class="sidebar-count">' + count + '</span>';
+      h += '</div></div>';
+      // Per-file progress bar for semantic files
+      const smKeys = smData.models.map(sm => 'semantic:' + sm.name + ':' + sm.modelRef);
+      let fApproved = 0, fNeedsChange = 0;
+      smKeys.forEach(k => {
+        if (reviews[k] === 'approved') fApproved++;
+        else if (reviews[k] === 'needs_change') fNeedsChange++;
+      });
+      const fTotal = smKeys.length;
+      if (fTotal > 0 && (fApproved > 0 || fNeedsChange > 0)) {
+        h += '<div class="sidebar-progress" style="margin:0 12px">';
+        h += '<div style="width:' + (fApproved / fTotal * 100) + '%;background:var(--ac)"></div>';
+        h += '<div style="width:' + (fNeedsChange / fTotal * 100) + '%;background:var(--rd)"></div>';
+        h += '</div>';
+      }
+    }
+  }
   h += '</div>';
   document.getElementById('sidebar').innerHTML = h;
 }
@@ -243,6 +338,74 @@ window.toggleSidebar = function() {
   const ov = document.getElementById('sidebar-overlay');
   sb.classList.toggle('open');
   ov.classList.toggle('open');
+};
+
+let sidebarCollapsed = false;
+window.toggleSidebarCollapse = function() {
+  const sb = document.getElementById('sidebar');
+  sidebarCollapsed = !sidebarCollapsed;
+  sb.classList.toggle('collapsed', sidebarCollapsed);
+};
+
+function openRightPanel(headerHTML, bodyHTML) {
+  const panel = document.getElementById('right-panel');
+  let h = '<div class="right-panel-header">';
+  h += '<div style="display:flex;align-items:center;gap:8px;min-width:0;overflow:hidden">' + headerHTML + '</div>';
+  h += '<button onclick="closeRightPanel()" style="background:none;border:none;color:var(--txm);cursor:pointer;font-size:16px;padding:4px 6px;border-radius:4px;transition:color .15s" onmouseover="this.style.color=\'var(--tx)\'" onmouseout="this.style.color=\'var(--txm)\'">\u2715</button>';
+  h += '</div>';
+  h += '<div class="right-panel-body">' + bodyHTML + '</div>';
+  panel.innerHTML = h;
+  panel.classList.add('open');
+  document.getElementById('panel-resize').style.display = 'block';
+}
+
+window.closeRightPanel = function() {
+  const panel = document.getElementById('right-panel');
+  panel.classList.remove('open');
+  panel.style.width = '';
+  document.getElementById('panel-resize').style.display = 'none';
+};
+window.closeCTEPanel = closeRightPanel;
+
+window.openCTEPanel = function(file) {
+  const parsed = (DATA.cteResults || {})[file];
+  if (!parsed) return;
+  const header = '<span class="badge" style="color:var(--cy);background:var(--cyb)">CTE</span>' +
+    '<span style="font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(file.split('/').pop()) + '</span>' +
+    '<span style="font-size:11px;color:var(--txm);flex-shrink:0">' + parsed.ctes.length + ' CTEs</span>';
+  openRightPanel(header, renderCTEGraph(parsed));
+};
+
+window.openSourcePanel = function(file, targetLine) {
+  const raw = (DATA.fileContents || {})[file];
+  if (!raw) return;
+  const ext = file.split('.').pop()?.toLowerCase();
+  const isSql = ext === 'sql';
+  const lines = raw.split('\n');
+  let body = '<div class="source-lines" style="margin:0;padding:8px 0;font-family:var(--fn);font-size:12px;line-height:1.7;overflow-x:auto">';
+  for (let i = 0; i < lines.length; i++) {
+    const ln = i + 1;
+    const isTarget = ln === targetLine;
+    const highlighted = isSql ? highlightSQL(lines[i]) : highlightYAML(lines[i]);
+    body += '<div id="src-line-' + ln + '" style="display:flex;' + (isTarget ? 'background:var(--orb);' : '') + '">';
+    body += '<span style="min-width:40px;padding:0 8px;text-align:right;color:' + (isTarget ? 'var(--or)' : 'var(--txm)') + ';user-select:none;flex-shrink:0;font-size:11px">' + ln + '</span>';
+    body += '<span style="flex:1;padding-right:12px;white-space:pre-wrap">' + (highlighted || ' ') + '</span>';
+    body += '</div>';
+  }
+  body += '</div>';
+  const badge = isSql
+    ? '<span class="badge" style="color:var(--or);background:var(--orb)">SQL</span>'
+    : '<span class="badge" style="color:var(--pu);background:var(--pub)">YAML</span>';
+  const lineInfo = targetLine ? '<span style="font-size:10px;color:var(--or);flex-shrink:0">L' + targetLine + '</span>' : '';
+  const header = badge +
+    '<span style="font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(file.split('/').pop()) + '</span>' + lineInfo;
+  openRightPanel(header, body);
+  if (targetLine) {
+    setTimeout(function() {
+      const el = document.getElementById('src-line-' + targetLine);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 50);
+  }
 };
 
 // Sidebar resize drag
@@ -267,6 +430,35 @@ window.toggleSidebar = function() {
     if (!dragging) return;
     dragging = false;
     handle.classList.remove('active');
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+  });
+})();
+
+// Right panel resize drag
+(function() {
+  const handle = document.getElementById('panel-resize');
+  const panel = document.getElementById('right-panel');
+  if (!handle || !panel) return;
+  let dragging = false;
+  handle.addEventListener('mousedown', function(e) {
+    e.preventDefault();
+    dragging = true;
+    handle.classList.add('active');
+    panel.classList.add('dragging');
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  });
+  document.addEventListener('mousemove', function(e) {
+    if (!dragging) return;
+    const w = Math.min(800, Math.max(250, window.innerWidth - e.clientX));
+    panel.style.width = w + 'px';
+  });
+  document.addEventListener('mouseup', function() {
+    if (!dragging) return;
+    dragging = false;
+    handle.classList.remove('active');
+    panel.classList.remove('dragging');
     document.body.style.cursor = '';
     document.body.style.userSelect = '';
   });
@@ -304,7 +496,7 @@ function init() {
   });
   if (DATA.coverageData) {
     DATA.coverageData.forEach(cov => {
-      cov.columns.filter(c => c.status === 'untested').forEach(c => {
+      cov.columns.filter(c => c.status === 'untested' || c.status === 'excluded').forEach(c => {
         const k = 'col:' + cov.model + ':' + c.name;
         if (!reviews[k]) { reviews[k] = 'pending'; comments[k] = ''; }
       });
@@ -333,7 +525,7 @@ async function poll() {
       });
       if (DATA.coverageData) {
         DATA.coverageData.forEach(cov => {
-          cov.columns.filter(c => c.status === 'untested').forEach(c => {
+          cov.columns.filter(c => c.status === 'untested' || c.status === 'excluded').forEach(c => {
             const k = 'col:' + cov.model + ':' + c.name;
             if (!reviews[k]) { reviews[k] = 'pending'; comments[k] = ''; }
           });
@@ -453,7 +645,8 @@ function renderCTEGraph(parsed) {
 
 window.selectCTENode = function(nodeId) {
   var cteResults = DATA.cteResults || {};
-  var detail = document.getElementById('cte-detail');
+  var panel = document.getElementById('right-panel');
+  var detail = panel ? panel.querySelector('#cte-detail') : document.getElementById('cte-detail');
   if (!detail) return;
   for (var file in cteResults) {
     var parsed = cteResults[file];
@@ -593,7 +786,7 @@ function renderReviewBtns(key) {
 
 function renderComment(key) {
   const jKey = jsStr(key);
-  return '<div style="padding:0 18px 12px"><textarea class="comment-box" placeholder="Review comment..." onclick="event.stopPropagation()" oninput="setComment(' + jKey + ',this.value)">' + esc(comments[key] || '') + '</textarea></div>';
+  return '<div style="padding:0 18px 12px"><textarea class="comment-box" placeholder="Review comment..." onclick="event.stopPropagation()" onkeydown="if(event.key===\'Escape\'){this.blur();event.stopPropagation()}" oninput="setComment(' + jKey + ',this.value)">' + esc(comments[key] || '') + '</textarea></div>';
 }
 
 function renderConfig(config) {
@@ -652,11 +845,20 @@ function matchFilter(key, type) {
 
 function render() {
   const tests = selectedFile ? DATA.allTests.filter(t => t.sourceFile === selectedFile) : DATA.allTests;
-  const coverage = DATA.coverageData || [];
+  const coverage = selectedFile ? (DATA.coverageData || []).filter(c => c.sourceFile === selectedFile) : (DATA.coverageData || []);
+  const fileSM = selectedFile ? (DATA.semanticModels || []).filter(sm => sm.sourceFile === selectedFile) : (DATA.semanticModels || []);
+  const fileMetrics = selectedFile ? (DATA.metrics || []).filter(mt => mt.sourceFile === selectedFile) : (DATA.metrics || []);
   // Stats always computed from ALL tests (for global filter buttons)
   const globalKeys = [...new Set(DATA.allTests.map(reviewKey))];
   const semanticKeys = (DATA.semanticModels || []).map(sm => 'semantic:' + sm.name + ':' + sm.modelRef);
-  const stats = { total: globalKeys.length + semanticKeys.length, unit: 0, schema: 0, data: 0, semantic: semanticKeys.length, approved: 0, needs_change: 0, pending: 0 };
+  // Collect excluded/untested column keys for stats
+  const colKeys = [];
+  (DATA.coverageData || []).forEach(cov => {
+    cov.columns.filter(c => c.status === 'untested' || c.status === 'excluded').forEach(c => {
+      colKeys.push('col:' + cov.model + ':' + c.name);
+    });
+  });
+  const stats = { total: globalKeys.length + semanticKeys.length + colKeys.length, unit: 0, schema: 0, data: 0, semantic: semanticKeys.length, approved: 0, needs_change: 0, pending: 0 };
   const seen = new Set();
   DATA.allTests.forEach(t => {
     const k = reviewKey(t);
@@ -667,6 +869,7 @@ function render() {
       stats[reviews[k] || 'pending']++;
     }
   });
+  colKeys.forEach(k => { if (!seen.has(k)) { seen.add(k); stats.schema++; stats[reviews[k] || 'pending']++; } });
   semanticKeys.forEach(k => { stats[reviews[k] || 'pending']++; });
 
   let h = '';
@@ -675,7 +878,11 @@ function render() {
   if (selectedFile) {
     h += '<span style="color:var(--bl);cursor:pointer" onclick="selectFile(null)">\u2190 All Files</span> / ';
     h += '<span style="color:var(--tx)">' + esc(selectedFile) + '</span>';
-    h += ' \u2014 ' + tests.length + ' tests';
+    const parts = [];
+    if (tests.length) parts.push(tests.length + ' tests');
+    if (fileSM.length) parts.push(fileSM.length + ' semantic models');
+    if (fileMetrics.length) parts.push(fileMetrics.length + ' metrics');
+    if (parts.length) h += ' \u2014 ' + parts.join(', ');
   } else {
     h += DATA.fileCount + ' files / ' + tests.length + ' tests / ' + stats.total + ' review items (Unit: ' + stats.unit + ', Column: ' + stats.schema + ', Data: ' + stats.data + (stats.semantic ? ', Semantic: ' + stats.semantic : '') + ')';
   }
@@ -724,6 +931,15 @@ function render() {
 
   const models = groupByModel(tests);
 
+  // Add model groups for semantic models and coverage in this file
+  fileSM.forEach(sm => {
+    const ref = sm.modelRef || sm.name;
+    if (!models[ref]) models[ref] = { unit: [], schema: [], data: [], modelLevel: [] };
+  });
+  coverage.forEach(cov => {
+    if (!models[cov.model]) models[cov.model] = { unit: [], schema: [], data: [], modelLevel: [] };
+  });
+
   for (const [modelName, group] of Object.entries(models)) {
     const modelId = 'model_' + modelName.replace(/[^a-zA-Z0-9]/g, '_');
     const cov = coverage.find(c => c.model === modelName);
@@ -734,23 +950,34 @@ function render() {
       const hasUnit = filter === 'unit' && group.unit.length > 0;
       const hasSchema = filter === 'schema' && (group.schema.length > 0 || group.modelLevel.length > 0);
       const hasData = filter === 'data' && group.data.length > 0;
-      const hasSemantic = filter === 'semantic' && (DATA.semanticModels || []).some(sm => sm.modelRef === modelName);
+      const hasSemantic = filter === 'semantic' && fileSM.some(sm => sm.modelRef === modelName);
       const hasStatus = ['approved', 'needs_change', 'pending'].includes(filter) && (
         [...group.unit, ...group.schema, ...group.data, ...group.modelLevel].some(t => reviews[reviewKey(t)] === filter) ||
-        (DATA.semanticModels || []).filter(sm => sm.modelRef === modelName).some(sm => reviews['semantic:' + sm.name + ':' + modelName] === filter) ||
-        (cov ? cov.columns.filter(c => c.status === 'untested').some(c => reviews['col:' + modelName + ':' + c.name] === filter) : false)
+        fileSM.filter(sm => sm.modelRef === modelName).some(sm => reviews['semantic:' + sm.name + ':' + modelName] === filter) ||
+        (cov ? cov.columns.filter(c => c.status === 'untested' || c.status === 'excluded').some(c => reviews['col:' + modelName + ':' + c.name] === filter) : false)
       );
       if (!hasUnit && !hasSchema && !hasData && !hasSemantic && !hasStatus) continue;
     }
 
     const isOpen = openSections[modelId] !== false;
 
+    // Check for CTE data for this model
+    const cteResults = DATA.cteResults || {};
+    const modelCTEFile = Object.keys(cteResults).find(f => f.split('/').pop().replace(/\.sql$/i, '') === modelName);
+
     h += '<div class="model-group">';
     h += '<div class="model-head" onclick="toggleSection(\'' + modelId + '\')">';
     h += '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">';
     h += '<span class="arrow ' + (isOpen ? 'open' : '') + '">\u25B6</span>';
     h += '<span style="font-size:14px;font-weight:700;font-family:var(--fn)">' + esc(modelName) + '</span>';
-    h += '<span style="font-size:12px;color:var(--txd)">' + testCount + ' tests</span>';
+    const smCountForHeader = fileSM.filter(sm => sm.modelRef === modelName).length;
+    if (testCount > 0) h += '<span style="font-size:12px;color:var(--txd)">' + testCount + ' tests</span>';
+    if (smCountForHeader > 0) h += '<span style="font-size:12px;color:var(--cy)">' + smCountForHeader + ' semantic</span>';
+    if (modelCTEFile) {
+      h += '<button class="cte-open-btn" onclick="event.stopPropagation();openCTEPanel(' + jsStr(modelCTEFile) + ')" title="Show CTE dependency graph">';
+      h += '\u29BF CTE ' + cteResults[modelCTEFile].ctes.length;
+      h += '</button>';
+    }
     const modelDesc = (DATA.modelDescriptions || {})[modelName];
     if (modelDesc) h += '<span style="font-size:12px;color:var(--txm);font-weight:400">' + esc(modelDesc) + '</span>';
     if (cov) {
@@ -765,22 +992,14 @@ function render() {
 
     h += '<div class="model-body ' + (isOpen ? 'open' : '') + '" id="' + modelId + '">';
 
-    // Source files for this model
+    // Source file buttons (open in right panel)
     const sourceFiles = [...new Set([...group.unit, ...group.schema, ...group.data, ...group.modelLevel].map(t => t.sourceFile).filter(Boolean))];
     if (sourceFiles.length && (DATA.fileContents || {})[sourceFiles[0]]) {
       h += '<div style="padding:8px 18px;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">';
       sourceFiles.forEach(sf => {
-        const rawId = 'raw_model_' + modelName.replace(/[^a-zA-Z0-9]/g, '_') + '_' + sf.replace(/[^a-zA-Z0-9]/g, '_');
-        h += '<button class="raw-btn" onclick="event.stopPropagation();toggleRaw(\'' + rawId + '\',this)">' + esc(sf.split('/').pop()) + '</button>';
+        h += '<button class="raw-btn" onclick="event.stopPropagation();openSourcePanel(' + jsStr(sf) + ')">' + esc(sf.split('/').pop()) + '</button>';
       });
       h += '</div>';
-      sourceFiles.forEach(sf => {
-        const rawId = 'raw_model_' + modelName.replace(/[^a-zA-Z0-9]/g, '_') + '_' + sf.replace(/[^a-zA-Z0-9]/g, '_');
-        const ext = sf.split('.').pop()?.toLowerCase();
-        const raw = (DATA.fileContents || {})[sf] || '';
-        const highlighted = (ext === 'sql') ? highlightSQL(raw) : highlightYAML(raw);
-        h += '<pre class="raw-pre" id="' + rawId + '" style="display:none">' + highlighted + '</pre>';
-      });
     }
 
     // Unit tests
@@ -820,10 +1039,13 @@ function render() {
         test.branchAnalysis.forEach(b => {
           const color = b.covered ? 'var(--ac)' : 'var(--or)';
           const icon = b.covered ? '\u2713' : '\u2717';
-          h += '<div style="font-size:12px;font-family:var(--fn);display:flex;gap:8px;align-items:baseline">';
+          const clickable = b.line && test.branchSourceFile;
+          const onclick = clickable ? ' onclick="openSourcePanel(' + jsStr(test.branchSourceFile) + ',' + b.line + ')" style="cursor:pointer;font-size:12px;font-family:var(--fn);display:flex;gap:8px;align-items:baseline;padding:2px 0;border-radius:3px;transition:background .1s" onmouseover="this.style.background=\'var(--sf2)\'" onmouseout="this.style.background=\'transparent\'"' : ' style="font-size:12px;font-family:var(--fn);display:flex;gap:8px;align-items:baseline;padding:2px 0"';
+          h += '<div' + onclick + '>';
           h += '<span style="color:' + color + '">' + icon + '</span>';
           h += '<span class="badge" style="color:var(--txm);background:var(--sf2);font-size:10px">' + esc(b.type) + '</span>';
           h += '<code style="color:var(--bl);font-size:12px">' + esc(b.condition) + '</code>';
+          if (b.line) { const bsf = test.branchSourceFile ? esc(test.branchSourceFile.split('/').pop()) + ':' : ''; h += '<span style="color:var(--txm);font-size:10px;font-family:var(--fn)">' + bsf + b.line + '</span>'; }
           if (!b.covered) h += '<span style="color:var(--txm);font-size:11px;font-style:italic">' + esc(b.coverageNote) + '</span>';
           h += '</div>';
         });
@@ -934,6 +1156,30 @@ function render() {
       }
     }
 
+    // Excluded columns (no_test: true)
+    if (cov) {
+      const excludedCols = cov.columns.filter(c => c.status === 'excluded');
+      for (const col of excludedCols) {
+        if (colGroups[col.name]) continue;
+        const key = 'col:' + modelName + ':' + col.name;
+        if (!matchFilter(key, 'schema')) continue;
+        h += '<div class="card" data-review-key="' + esc(key) + '" onclick="focusCard(this)" style="border-color:var(--txm);' + cardBorderStyle(key) + '">';
+        h += '<div class="card-head"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">';
+        h += '<span class="badge" style="color:var(--txm);background:var(--sf2)">Excluded</span>';
+        h += '<span class="card-name">' + esc(col.name) + '</span>';
+        if (col.data_type) h += '<span class="dtype-chip">' + esc(col.data_type) + '</span>';
+        h += '</div>' + renderReviewBtns(key) + '</div>';
+        if (col.description) {
+          h += '<div style="padding:4px 18px 8px;font-size:12px;color:var(--txd)">' + esc(col.description) + '</div>';
+        }
+        if (col.excludeReason) {
+          h += '<div style="padding:2px 18px 8px;font-size:12px;color:var(--txm);font-style:italic">' + esc(col.excludeReason) + '</div>';
+        }
+        h += renderComment(key);
+        h += '</div>';
+      }
+    }
+
     // Coverage summary
     if (cov) {
       const covId = 'cov_' + modelName.replace(/[^a-zA-Z0-9]/g, '_');
@@ -971,8 +1217,8 @@ function render() {
 
     // Semantic Layer cards for this model (one card per semantic model)
     const modelWarnings = (DATA.semanticWarnings || []).filter(w => w.model === modelName);
-    const modelSM = (DATA.semanticModels || []).filter(sm => sm.modelRef === modelName);
-    const allMetrics = (DATA.metrics || []);
+    const modelSM = fileSM.filter(sm => sm.modelRef === modelName);
+    const allMetrics = fileMetrics;
     for (const sm of modelSM) {
       const smKey = 'semantic:' + sm.name + ':' + modelName;
       if (!matchFilter(smKey, 'semantic')) continue;
@@ -1188,13 +1434,11 @@ function render() {
         h += '</div>';
       }
 
-      // Raw YAML toggle
+      // Raw YAML button (open in right panel)
       if (sm.sourceFile && (DATA.fileContents || {})[sm.sourceFile]) {
-        const rawId = 'raw_sm_' + sm.name.replace(/[^a-zA-Z0-9]/g, '_');
         h += '<div style="padding:8px 18px;display:flex;justify-content:flex-end">';
-        h += '<button class="raw-btn" onclick="event.stopPropagation();toggleRaw(\'' + rawId + '\',this)">\u2630 YAML</button>';
+        h += '<button class="raw-btn" onclick="event.stopPropagation();openSourcePanel(' + jsStr(sm.sourceFile) + ')">\u2630 YAML</button>';
         h += '</div>';
-        h += '<pre class="raw-pre" id="' + rawId + '" style="display:none">' + highlightYAML((DATA.fileContents || {})[sm.sourceFile]) + '</pre>';
       }
 
       h += renderComment(smKey);
@@ -1214,29 +1458,10 @@ function render() {
       h += '</div>';
     }
 
-    // CTE Structure for this model
-    const cteResults = DATA.cteResults || {};
-    for (const [file, parsed] of Object.entries(cteResults)) {
-      const cteModelName = file.split('/').pop().replace(/\.sql$/i, '');
-      if (cteModelName !== modelName) continue;
-      const cteId = 'cte_' + file.replace(/[^a-zA-Z0-9]/g, '_');
-      const isCtOpen = openSections[cteId] === true;
-      h += '<div class="cte-card">';
-      h += '<div class="cte-head" onclick="toggleSection(\'' + cteId + '\')">';
-      h += '<span class="arrow ' + (isCtOpen ? 'open' : '') + '">\u25B6</span>';
-      h += '<span class="badge" style="color:var(--cy);background:var(--cyb)">CTE</span>';
-      h += '<span style="font-size:11px;color:var(--txd)">' + esc(file.split('/').pop()) + '</span>';
-      h += '<span class="card-dim">' + parsed.ctes.length + ' CTEs</span>';
-      h += '</div>';
-      h += '<div class="cte-body" id="' + cteId + '" style="display:' + (isCtOpen ? 'block' : 'none') + '">';
-      h += renderCTEGraph(parsed);
-      h += '</div></div>';
-    }
-
     h += '</div></div>';
   }
 
-  if (!Object.keys(models).length) h += '<div style="text-align:center;padding:40px;color:var(--txm)">No matching tests</div>';
+  if (!Object.keys(models).length) h += '<div style="text-align:center;padding:40px;color:var(--txm)">No matching items</div>';
 
 
   h += renderExportPanel(stats);
@@ -1376,11 +1601,6 @@ window.copyPrompt = async function() {
   setTimeout(() => { btn.textContent = '\uD83D\uDCCB Copy Prompt'; btn.classList.remove('copied'); }, 2000);
 };
 
-window.toggleRaw = function(id, btnEl) {
-  const el = document.getElementById(id);
-  if (el.style.display === 'none') { el.style.display = 'block'; if (btnEl) btnEl.classList.add('active'); }
-  else { el.style.display = 'none'; if (btnEl) btnEl.classList.remove('active'); }
-};
 
 let focusedCardIndex = -1;
 const getReviewCards = () => [...document.querySelectorAll('.card[data-review-key]')];
@@ -1402,6 +1622,8 @@ document.addEventListener('keydown', function(e) {
     if (help) help.style.display = help.style.display === 'none' ? 'block' : 'none';
     return;
   }
+  if (e.key === 'b') { toggleSidebarCollapse(); return; }
+  if (e.key === 'e') { const rp = document.getElementById('right-panel'); if (rp) { if (rp.classList.contains('open')) { closeRightPanel(); } else { const cteR = DATA.cteResults || {}; const cteFile = Object.keys(cteR)[0]; if (cteFile) { openCTEPanel(cteFile); } else { const fc = DATA.fileContents || {}; const srcFile = Object.keys(fc)[0]; if (srcFile) openSourcePanel(srcFile); } } } return; }
   if (!cards.length) return;
   if (e.key === 'j') {
     focusedCardIndex = Math.min(focusedCardIndex + 1, cards.length - 1);
