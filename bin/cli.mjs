@@ -42,7 +42,7 @@ function findTestFiles(dir, patterns = []) {
 
 function loadAll(dir, patterns, fileList) {
   const files = fileList || findTestFiles(dir, patterns);
-  const allTests = [], cteResults = {}, allCoverage = [], allColumnMeta = {}, allSemanticModels = [], allMetrics = [], allModelDescriptions = {};
+  const allTests = [], cteResults = {}, allCoverage = [], allColumnMeta = {}, allSemanticModels = [], allMetrics = [], allSavedQueries = [], allModelDescriptions = {};
   const sqlByModel = {}; // model name -> SQL content for branch analysis
   const fileContents = {}; // filename -> raw content
   const parseErrors = [];
@@ -51,13 +51,14 @@ function loadAll(dir, patterns, fileList) {
       const content = readFileSync(f, "utf-8");
       const rel = f.replace(dir + "/", "");
       fileContents[rel] = content;
-      const { tests, coverage, columnMeta, semanticModels, metrics, modelDescriptions } = parseFile(content, rel);
+      const { tests, coverage, columnMeta, semanticModels, metrics, savedQueries, modelDescriptions } = parseFile(content, rel);
       allTests.push(...tests);
       allCoverage.push(...coverage);
       Object.assign(allColumnMeta, columnMeta);
       Object.assign(allModelDescriptions, modelDescriptions || {});
       allSemanticModels.push(...semanticModels);
       allMetrics.push(...(metrics || []));
+      allSavedQueries.push(...(savedQueries || []));
       if (extname(f).toLowerCase() === ".sql") {
         const cte = parseCTEs(content);
         if (cte.ctes.length) cteResults[rel] = cte;
@@ -98,7 +99,7 @@ function loadAll(dir, patterns, fileList) {
     }
   }
   const context = { dir: resolve(dir), gitBranch };
-  return { allTests, cteResults, coverageData: allCoverage, columnMeta: allColumnMeta, modelDescriptions: allModelDescriptions, semanticModels: allSemanticModels, metrics: allMetrics, semanticWarnings, fileContents, fileCount: files.length, parseErrors, context };
+  return { allTests, cteResults, coverageData: allCoverage, columnMeta: allColumnMeta, modelDescriptions: allModelDescriptions, semanticModels: allSemanticModels, metrics: allMetrics, savedQueries: allSavedQueries, semanticWarnings, fileContents, fileCount: files.length, parseErrors, context };
 }
 
 /* ═══════════════════════════════════════════════

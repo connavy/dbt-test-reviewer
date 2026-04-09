@@ -440,6 +440,54 @@ export function extractMetrics(parsed) {
   });
 }
 
+/* ═══════════════════════════════════════════════
+   Saved Queries (MetricFlow)
+   ═══════════════════════════════════════════════ */
+const METRICFLOW_REF_RE = /^(Entity|Dimension|TimeDimension|Metric)\s*\(\s*['"]([^'"]+)['"]\s*(?:,\s*['"]([^'"]+)['"]\s*)?\)/;
+
+export function parseMetricFlowRef(str) {
+  if (typeof str !== "string") return null;
+  const m = str.match(METRICFLOW_REF_RE);
+  if (!m) return null;
+  const typeMap = { Entity: "entity", Dimension: "dimension", TimeDimension: "time_dimension", Metric: "metric" };
+  const result = { type: typeMap[m[1]], name: m[2] };
+  if (m[1] === "TimeDimension" && m[3]) result.grain = m[3];
+  return result;
+}
+
+export function extractSavedQueries(parsed) {
+  if (!Array.isArray(parsed.saved_queries)) return [];
+  return parsed.saved_queries.filter(sq => sq && typeof sq === "object").map(sq => {
+    const qp = sq.query_params && typeof sq.query_params === "object" ? sq.query_params : {};
+    const metrics = Array.isArray(qp.metrics) ? qp.metrics.filter(Boolean) : [];
+    const groupBy = Array.isArray(qp.group_by) ? qp.group_by.filter(Boolean).map(String) : [];
+    const where = Array.isArray(qp.where) ? qp.where.filter(Boolean).map(String) : [];
+    const orderBy = Array.isArray(qp.order_by) ? qp.order_by.filter(Boolean).map(String) : [];
+    const limit = typeof qp.limit === "number" ? qp.limit : null;
+
+    const groupByParsed = { entities: [], dimensions: [], timeDimensions: [] };
+    for (const raw of groupBy) {
+      const ref = parseMetricFlowRef(raw);
+      if (!ref) continue;
+      if (ref.type === "entity") groupByParsed.entities.push(ref.name);
+      else if (ref.type === "dimension") groupByParsed.dimensions.push(ref.name);
+      else if (ref.type === "time_dimension") groupByParsed.timeDimensions.push(ref.name);
+    }
+
+    return {
+      name: sq.name || "?",
+      description: sq.description || "",
+      label: sq.label || "",
+      metrics,
+      groupBy,
+      groupByParsed,
+      where,
+      orderBy,
+      limit,
+    };
+  });
+}
+
 export function crossReferenceSemanticCoverage(semanticModels, coverageData) {
   const warnings = [];
   const covByModel = {};
@@ -686,6 +734,7 @@ export function parseFile(content, filename) {
   let columnMeta = {};
   let semanticModels = [];
   let metrics = [];
+  let savedQueries = [];
   let modelDescriptions = {};
   if (ext === "sql") {
     // Only treat as data test if in tests/ directory or has explicit -- name: comment
@@ -703,12 +752,14 @@ export function parseFile(content, filename) {
     modelDescriptions = extractModelDescriptions(parsed);
     semanticModels = extractSemanticModels(parsed);
     metrics = extractMetrics(parsed);
+    savedQueries = extractSavedQueries(parsed);
   }
   tests.forEach((t) => (t.sourceFile = filename));
   coverage.forEach((c) => (c.sourceFile = filename));
   semanticModels.forEach((sm) => (sm.sourceFile = filename));
   metrics.forEach((mt) => (mt.sourceFile = filename));
-  return { tests, coverage, columnMeta, semanticModels, metrics, modelDescriptions };
+  savedQueries.forEach((sq) => (sq.sourceFile = filename));
+  return { tests, coverage, columnMeta, semanticModels, metrics, savedQueries, modelDescriptions };
 }
 
 /* ═══════════════════════════════════════════════

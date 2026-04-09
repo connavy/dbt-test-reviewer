@@ -1079,6 +1079,14 @@ function render() {
     if (!models[cov.model]) models[cov.model] = { unit: [], schema: [], data: [], modelLevel: [] };
   });
 
+  // Build metric → saved_queries lookup map (once, outside model loop)
+  const metricToSavedQueries = {};
+  (DATA.savedQueries || []).forEach(sq => {
+    (sq.metrics || []).forEach(m => {
+      (metricToSavedQueries[m] = metricToSavedQueries[m] || []).push(sq.name);
+    });
+  });
+
   let hasVisibleContent = false;
   for (const [modelName, group] of Object.entries(models)) {
     const modelId = 'model_' + modelName.replace(/[^a-zA-Z0-9]/g, '_');
@@ -1491,7 +1499,12 @@ function render() {
               }
             }
             h += '<tr style="border-bottom:1px solid var(--bd)">';
-            h += '<td style="padding:5px 12px 5px 0;font-family:var(--fn);color:var(--cy);font-weight:600">' + esc(mt.name) + '</td>';
+            h += '<td style="padding:5px 12px 5px 0;font-family:var(--fn);color:var(--cy);font-weight:600">' + esc(mt.name);
+            const sqRefs = metricToSavedQueries[mt.name];
+            if (sqRefs && sqRefs.length) {
+              h += ' <span style="font-size:9px;padding:1px 5px;border-radius:3px;background:var(--bg2,var(--s1));color:var(--txm);vertical-align:middle" title="' + esc(sqRefs.join(', ')) + '">\u{1F4CB} ' + sqRefs.length + ' saved</span>';
+            }
+            h += '</td>';
             h += '<td style="padding:5px 12px 5px 0;color:var(--tx)">' + esc(mt.label || '') + '</td>';
             h += '<td style="padding:5px 12px 5px 0;font-family:var(--fn);color:var(--txd);font-size:11px">' + esc(mt.measure || '') + '</td>';
             h += '<td style="padding:5px 12px 5px 0"><span style="font-size:10px;font-family:var(--fn);padding:1px 5px;border-radius:3px;background:var(--bg2,var(--s1));color:var(--txm)">' + esc(m.agg || '') + '</span></td>';
@@ -1615,6 +1628,44 @@ function render() {
         h += '<div style="padding:8px 18px;border-top:1px solid var(--bd);background:var(--orb)">';
         smWarnings.forEach(w => {
           h += '<div style="padding:3px 0;font-size:12px;color:var(--or)">\u26A0 ' + esc(w.hint) + '</div>';
+        });
+        h += '</div>';
+      }
+
+      // Saved queries referencing this semantic model's metrics
+      const smMeasureNames = new Set(sm.measures.map(m => m.name));
+      const smMetricNames = new Set(smMetrics.filter(mt => mt.measure && smMeasureNames.has(mt.measure)).map(mt => mt.name));
+      const relatedSQ = (DATA.savedQueries || []).filter(sq =>
+        (sq.metrics || []).some(m => smMetricNames.has(m))
+      );
+      if (relatedSQ.length) {
+        h += '<div style="padding:10px 18px 2px;font-size:10px;font-weight:700;font-family:var(--fn);color:var(--txm);letter-spacing:.05em;text-transform:uppercase">Saved Queries</div>';
+        h += '<div style="padding:4px 18px 10px">';
+        relatedSQ.forEach(sq => {
+          const totalMetrics = (sq.metrics || []).length;
+          h += '<div style="padding:6px 10px;margin:4px 0;border-radius:6px;border:1px solid var(--bd);background:var(--bg2,var(--s1))">';
+          h += '<div style="display:flex;align-items:center;gap:8px">';
+          h += '<span style="font-family:var(--fn);font-weight:600;font-size:12px;color:var(--tx)">' + esc(sq.name) + '</span>';
+          if (sq.label) {
+            h += '<span style="font-size:11px;color:var(--txm)">' + esc(sq.label) + '</span>';
+          }
+          h += '<span style="font-size:10px;padding:1px 6px;border-radius:3px;background:var(--cyb);color:var(--cy)">' + totalMetrics + ' metrics</span>';
+          h += '</div>';
+          if (sq.description) {
+            const desc = sq.description.length > 120 ? sq.description.slice(0, 120) + '...' : sq.description;
+            h += '<div style="font-size:11px;color:var(--txd);margin-top:3px;line-height:1.4">' + esc(desc) + '</div>';
+          }
+          if (sq.groupBy && sq.groupBy.length) {
+            h += '<div style="font-size:10px;color:var(--txm);margin-top:3px;font-family:var(--fn)">';
+            h += 'group_by: ' + sq.groupBy.map(g => esc(g)).join(', ');
+            h += '</div>';
+          }
+          if (sq.where && sq.where.length) {
+            h += '<div style="font-size:10px;color:var(--txm);margin-top:2px;font-family:var(--fn)">';
+            h += 'where: ' + sq.where.map(w => esc(w)).join(' AND ');
+            h += '</div>';
+          }
+          h += '</div>';
         });
         h += '</div>';
       }
