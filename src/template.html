@@ -1522,7 +1522,7 @@ function render() {
             h += '<td style="padding:5px 12px 5px 0;font-family:var(--fn);color:var(--cy);font-weight:600">' + esc(mt.name);
             const sqRefs = metricToSavedQueries[mt.name];
             if (sqRefs && sqRefs.length) {
-              h += ' <span style="font-size:9px;padding:1px 5px;border-radius:3px;background:var(--bg2,var(--s1));color:var(--txm);vertical-align:middle" title="' + esc(sqRefs.join(', ')) + '">\u{1F4CB} ' + sqRefs.length + ' saved</span>';
+              h += ' <span style="font-size:9px;padding:1px 5px;border-radius:3px;background:var(--bg2,var(--s1));color:var(--txm);vertical-align:middle" title="' + esc(sqRefs.join(', ')) + '">\u{1F4CB} ' + sqRefs.length + ' saved quer' + (sqRefs.length === 1 ? 'y' : 'ies') + '</span>';
             }
             h += '</td>';
             h += '<td style="padding:5px 12px 5px 0;color:var(--tx)">' + esc(mt.label || '') + '</td>';
