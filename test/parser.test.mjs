@@ -15,6 +15,8 @@ import {
   extractSemanticModels,
   extractMetrics,
   crossReferenceSemanticCoverage,
+  parseMetricFlowRef,
+  extractSavedQueries,
   parseFile,
 } from "../src/parser.mjs";
 
@@ -1010,5 +1012,159 @@ describe("extractMetrics", () => {
     const result = extractMetrics(parsed);
     assert.equal(result.length, 1);
     assert.equal(result[0].filter, "{{ Dimension('x') }} = true");
+  });
+});
+
+/* ═══════════════════════════════════════════════
+   parseMetricFlowRef
+   ═══════════════════════════════════════════════ */
+describe("parseMetricFlowRef", () => {
+  it("parses Entity reference", () => {
+    const result = parseMetricFlowRef("Entity('club')");
+    assert.deepStrictEqual(result, { type: "entity", name: "club" });
+  });
+
+  it("parses Dimension reference", () => {
+    const result = parseMetricFlowRef("Dimension('club__club_nm_short')");
+    assert.deepStrictEqual(result, { type: "dimension", name: "club__club_nm_short" });
+  });
+
+  it("parses TimeDimension with grain", () => {
+    const result = parseMetricFlowRef("TimeDimension('league_standing__snapshot_date', 'day')");
+    assert.deepStrictEqual(result, { type: "time_dimension", name: "league_standing__snapshot_date", grain: "day" });
+  });
+
+  it("parses Metric reference", () => {
+    const result = parseMetricFlowRef("Metric('current_point')");
+    assert.deepStrictEqual(result, { type: "metric", name: "current_point" });
+  });
+
+  it("ignores method chains like .descending(True)", () => {
+    const result = parseMetricFlowRef("Metric('current_point').descending(True)");
+    assert.deepStrictEqual(result, { type: "metric", name: "current_point" });
+  });
+
+  it("handles double quotes", () => {
+    const result = parseMetricFlowRef('Entity("club")');
+    assert.deepStrictEqual(result, { type: "entity", name: "club" });
+  });
+
+  it("returns null for invalid input", () => {
+    assert.strictEqual(parseMetricFlowRef("invalid"), null);
+    assert.strictEqual(parseMetricFlowRef(""), null);
+  });
+
+  it("returns null for non-string input", () => {
+    assert.strictEqual(parseMetricFlowRef(null), null);
+    assert.strictEqual(parseMetricFlowRef(undefined), null);
+    assert.strictEqual(parseMetricFlowRef(42), null);
+  });
+});
+
+/* ═══════════════════════════════════════════════
+   extractSavedQueries
+   ═══════════════════════════════════════════════ */
+describe("extractSavedQueries", () => {
+  it("extracts saved query with full query_params", () => {
+    const parsed = {
+      saved_queries: [{
+        name: "latest_league_standings",
+        description: "Latest league standings",
+        label: "Latest Standings",
+        query_params: {
+          metrics: ["current_point", "best_ranking"],
+          group_by: [
+            "Entity('club')",
+            "Dimension('club__club_nm_short')",
+            "TimeDimension('league_standing__snapshot_date', 'day')",
+          ],
+          where: ["{{ TimeDimension('league_standing__snapshot_date', 'day') }} = current_date()"],
+          order_by: ["Metric('current_point').descending(True)"],
+          limit: 20,
+        },
+      }],
+    };
+    const result = extractSavedQueries(parsed);
+    assert.strictEqual(result.length, 1);
+    assert.strictEqual(result[0].name, "latest_league_standings");
+    assert.strictEqual(result[0].description, "Latest league standings");
+    assert.strictEqual(result[0].label, "Latest Standings");
+    assert.deepStrictEqual(result[0].metrics, ["current_point", "best_ranking"]);
+
+    // groupByParsed
+    assert.strictEqual(result[0].groupByParsed.entities.length, 1);
+    assert.strictEqual(result[0].groupByParsed.entities[0], "club");
+    assert.strictEqual(result[0].groupByParsed.dimensions.length, 1);
+    assert.strictEqual(result[0].groupByParsed.dimensions[0], "club__club_nm_short");
+    assert.strictEqual(result[0].groupByParsed.timeDimensions.length, 1);
+    assert.strictEqual(result[0].groupByParsed.timeDimensions[0], "league_standing__snapshot_date");
+
+    assert.deepStrictEqual(result[0].where, [
+      "{{ TimeDimension('league_standing__snapshot_date', 'day') }} = current_date()",
+    ]);
+    assert.deepStrictEqual(result[0].orderBy, ["Metric('current_point').descending(True)"]);
+    assert.strictEqual(result[0].limit, 20);
+  });
+
+  it("returns empty array when saved_queries is missing", () => {
+    assert.deepStrictEqual(extractSavedQueries({}), []);
+    assert.deepStrictEqual(extractSavedQueries({ models: [] }), []);
+  });
+
+  it("handles saved query without optional fields", () => {
+    const parsed = {
+      saved_queries: [{
+        name: "simple_query",
+        query_params: {
+          metrics: ["total_revenue"],
+          group_by: ["Dimension('product__category')"],
+        },
+      }],
+    };
+    const result = extractSavedQueries(parsed);
+    assert.strictEqual(result.length, 1);
+    assert.strictEqual(result[0].name, "simple_query");
+    assert.strictEqual(result[0].description, "");
+    assert.strictEqual(result[0].label, "");
+    assert.deepStrictEqual(result[0].where, []);
+    assert.deepStrictEqual(result[0].orderBy, []);
+    assert.strictEqual(result[0].limit, null);
+  });
+
+  it("filters out null entries", () => {
+    const parsed = {
+      saved_queries: [
+        null,
+        { name: "valid", query_params: { metrics: ["m1"], group_by: [] } },
+        null,
+      ],
+    };
+    const result = extractSavedQueries(parsed);
+    assert.strictEqual(result.length, 1);
+    assert.strictEqual(result[0].name, "valid");
+  });
+
+  it("handles saved query without query_params", () => {
+    const parsed = {
+      saved_queries: [{ name: "no_params" }],
+    };
+    const result = extractSavedQueries(parsed);
+    assert.strictEqual(result.length, 1);
+    assert.strictEqual(result[0].name, "no_params");
+    assert.deepStrictEqual(result[0].metrics, []);
+    assert.deepStrictEqual(result[0].groupBy, []);
+    assert.deepStrictEqual(result[0].groupByParsed, {
+      entities: [],
+      dimensions: [],
+      timeDimensions: [],
+    });
+  });
+
+  it("defaults name to '?' when name is missing", () => {
+    const parsed = {
+      saved_queries: [{ query_params: { metrics: ["m1"], group_by: [] } }],
+    };
+    const result = extractSavedQueries(parsed);
+    assert.strictEqual(result[0].name, "?");
   });
 });
