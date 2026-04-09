@@ -1685,6 +1685,11 @@ function render() {
             h += 'where: ' + sq.where.map(w => esc(w)).join(' AND ');
             h += '</div>';
           }
+          if (sq.sourceFile && (DATA.fileContents || {})[sq.sourceFile]) {
+            h += '<div style="margin-top:4px;display:flex;justify-content:flex-end">';
+            h += '<button class="raw-btn" style="font-size:10px;padding:1px 6px" onclick="event.stopPropagation();openSourcePanel(' + jsStr(sq.sourceFile) + ')">\u2630 YAML</button>';
+            h += '</div>';
+          }
           h += '</div>';
         });
         h += '</div>';
