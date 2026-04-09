@@ -556,12 +556,12 @@ export function extractBranches(sql) {
 
   // CASE WHEN ... THEN
   for (const m of cleaned.matchAll(/WHEN\s+((?:(?!\bWHEN\b|\bTHEN\b).)+?)\s+THEN/gi)) {
-    branches.push({ type: "case_when", condition: m[1].trim(), line: offsetToLine(m.index) });
+    branches.push({ type: "case_when", condition: m[1].trim(), line: offsetToLine(m.index), _offset: m.index });
   }
   // ELSE (from CASE)
   for (const m of cleaned.matchAll(/ELSE\s+(.+?)(?=\bEND\b)/gi)) {
     const val = m[1].trim();
-    if (val) branches.push({ type: "case_else", condition: "ELSE", line: offsetToLine(m.index) });
+    if (val) branches.push({ type: "case_else", condition: "ELSE", line: offsetToLine(m.index), _offset: m.index });
   }
   // COALESCE
   for (const m of cleaned.matchAll(/COALESCE\s*\(([^,)]+)/gi)) {
@@ -571,6 +571,37 @@ export function extractBranches(sql) {
   for (const m of cleaned.matchAll(/\bI?IF\s*\((.+?)(?:,)/gi)) {
     branches.push({ type: "iif", condition: m[1].trim(), line: offsetToLine(m.index) });
   }
+
+  // Detect CASE...END blocks and assign caseGroupId to WHEN/ELSE branches
+  const caseBlocks = [];
+  let groupId = 0;
+  const caseStarts = [...cleaned.matchAll(/\bCASE\b/gi)].map(m => m.index);
+  for (const caseStart of caseStarts) {
+    let depth = 1, pos = caseStart + 4;
+    while (pos < cleaned.length && depth > 0) {
+      const sub = cleaned.slice(pos);
+      const nc = sub.search(/\bCASE\b/i);
+      const ne = sub.search(/\bEND\b/i);
+      if (ne < 0) break;
+      if (nc >= 0 && nc < ne) { depth++; pos += nc + 4; }
+      else { depth--; pos += ne + 3; }
+    }
+    caseBlocks.push({ start: caseStart, end: pos, id: groupId++ });
+  }
+  for (const b of branches) {
+    if (b._offset === undefined) continue;
+    // Find the innermost (smallest range) CASE block containing this branch
+    let best = null;
+    for (const cb of caseBlocks) {
+      if (b._offset >= cb.start && b._offset < cb.end) {
+        if (!best || (cb.end - cb.start) < (best.end - best.start)) best = cb;
+      }
+    }
+    if (best) b.caseGroupId = best.id;
+  }
+
+  // Clean up internal _offset field before returning
+  branches.forEach(b => delete b._offset);
 
   return branches;
 }
@@ -661,9 +692,44 @@ export function analyzeBranchCoverage(branches, givenRows) {
 
     // Table-qualified columns (cte.col) not in given → intermediate CTE column, not testable via input
     const notApplicable = allQualified && !referencedInGiven;
-    const covered = notApplicable ? true : b.type === "case_else" ? false : valueCovered;
+
+    // ELSE reachability: check if any given row has a value not matching any sibling WHEN condition
+    let elseCovered = false;
+    let elseNote = "ELSE reachability not analysed";
+    if (b.type === "case_else" && b.caseGroupId !== undefined) {
+      const siblingWhens = branches.filter(
+        s => s.type === "case_when" && s.caseGroupId === b.caseGroupId
+      );
+      const whenConditions = siblingWhens.map(s => {
+        const eq = s.condition.match(/(\w+)\s*=\s*'([^']*)'/i)
+               || s.condition.match(/(\w+)\s*=\s*"([^"]*)"/i)
+               || s.condition.match(/(\w+)\s*=\s*(\d+(?:\.\d+)?|true|false)\b/i);
+        return eq ? { col: eq[1].toLowerCase(), val: eq[2].toLowerCase() } : null;
+      });
+      const allParseable = whenConditions.length > 0 && whenConditions.every(c => c !== null);
+      const uniqueCols = new Set(whenConditions.filter(Boolean).map(c => c.col));
+
+      if (allParseable && uniqueCols.size === 1) {
+        const col = [...uniqueCols][0];
+        const whenValues = new Set(whenConditions.map(c => c.val));
+        const colValues = givenValues[col];
+        if (colValues) {
+          const hasElseRow = [...colValues].some(v => !whenValues.has(v) && v !== '__null__');
+          if (hasElseRow) {
+            elseCovered = true;
+            elseNote = "ELSE possibly covered";
+          } else {
+            elseNote = "all given values match WHEN conditions";
+          }
+        } else {
+          elseNote = "column not in given rows";
+        }
+      }
+    }
+
+    const covered = notApplicable ? true : b.type === "case_else" ? elseCovered : valueCovered;
     const coverageNote = notApplicable ? "n/a (intermediate column)"
-      : b.type === "case_else" ? "ELSE reachability not analysed"
+      : b.type === "case_else" ? elseNote
       : !referencedInGiven ? "column not in given rows"
       : valueCovered ? "possibly covered" : "value not found in given rows";
 
