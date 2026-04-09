@@ -104,6 +104,18 @@ html.light .yaml-key{color:#cf222e}html.light .yaml-str{color:#0a3069}html.light
 .sidebar-count{font-size:10px;color:var(--txm);background:var(--sf2);padding:1px 6px;border-radius:8px}
 .sidebar-dot{width:6px;height:6px;border-radius:50%}
 .sidebar-sep{height:1px;background:var(--bd);margin:6px 12px}
+.sidebar-test{display:flex;align-items:center;gap:6px;padding:3px 12px 3px 24px;font-size:11px;cursor:pointer;color:var(--txd);transition:background .1s}
+.sidebar-test:hover{background:var(--sf2)}
+.sidebar-test-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--fn)}
+.sidebar-model-label{padding:4px 12px 2px 18px;font-size:10px;font-weight:600;color:var(--txm);font-family:var(--fn)}
+.search-container{position:relative;display:flex;align-items:center;flex:1;max-width:360px;min-width:180px;margin:0 12px;background:var(--bg);border:1px solid var(--bd);border-radius:6px;padding:0 8px;transition:border-color .15s,box-shadow .15s}
+.search-container:focus-within{border-color:var(--bl);box-shadow:0 0 0 1px var(--bl)}
+.search-icon{color:var(--txm);font-size:14px;flex-shrink:0;margin-right:6px;pointer-events:none}
+.search-input{flex:1;padding:6px 0;border:none;outline:none;background:transparent;color:var(--tx);font-size:13px;font-family:var(--fn);min-width:0}
+.search-input::placeholder{color:var(--txm);font-size:12px}
+.search-kbd{font-size:10px;font-family:var(--fn);color:var(--txm);background:var(--sf2);border:1px solid var(--bd);border-radius:3px;padding:1px 5px;margin-left:4px;flex-shrink:0;pointer-events:none}
+.search-clear{background:none;border:none;color:var(--txm);cursor:pointer;font-size:16px;padding:2px 4px;margin-left:4px;border-radius:3px;flex-shrink:0;line-height:1;transition:color .15s}
+.search-clear:hover{color:var(--tx)}
 .hamburger{display:none;padding:6px 10px;border:1px solid var(--bd);border-radius:4px;background:transparent;color:var(--tx);font-size:16px;cursor:pointer;line-height:1}
 .sidebar-close{display:none;padding:4px 8px;border:none;background:transparent;color:var(--txm);font-size:16px;cursor:pointer;position:absolute;top:8px;right:8px}
 @media(max-width:768px){
@@ -143,6 +155,12 @@ html.light .yaml-key{color:#cf222e}html.light .yaml-str{color:#0a3069}html.light
 </style></head><body>
 <div class="header">
   <h1><button class="hamburger" id="hamburger-btn" onclick="toggleSidebar()">&#9776;</button><span class="icon">T</span> dbt Test Reviewer <span id="header-context" style="font-size:12px;font-weight:400;color:var(--txm)"></span></h1>
+  <div class="search-container" role="search" aria-label="Search tests">
+    <span class="search-icon">&#x2315;</span>
+    <input type="text" id="search-input" class="search-input" placeholder="Search models, columns, tests..." oninput="onSearchInput(this.value)" onkeydown="onSearchKeydown(event)" maxlength="200">
+    <kbd class="search-kbd" id="search-kbd">&#8984;K</kbd>
+    <button class="search-clear" id="search-clear" onclick="clearSearch()" style="display:none">&times;</button>
+  </div>
   <div style="display:flex;align-items:center;gap:6px">
     <div style="font-size:12px;color:var(--txd)" id="status-indicator"></div>
     <button class="theme-toggle" onclick="toggleSidebarCollapse()" title="Toggle sidebar (b)">&#9776;</button>
@@ -160,15 +178,18 @@ html.light .yaml-key{color:#cf222e}html.light .yaml-str{color:#0a3069}html.light
   <div class="right-panel" id="right-panel"></div>
 </div>
 <div id="kbd-help" class="kbd-help" style="display:none">
+<kbd>/</kbd> or <kbd>&#8984;K</kbd> Focus search<br>
 <kbd>j</kbd> / <kbd>k</kbd> Navigate cards<br>
 <kbd>1</kbd> OK &middot; <kbd>2</kbd> Needs Change &middot; <kbd>3</kbd> Pending<br>
 <kbd>b</kbd> Toggle sidebar &middot; <kbd>e</kbd> Toggle CTE panel<br>
-<kbd>?</kbd> or <kbd>/</kbd> Toggle this help
+<kbd>?</kbd> Toggle this help
 </div>
 <script>
 const POLL_INTERVAL = 2000;
 let DATA = {"allTests":[{"type":"schema","name":"unique","model":"fct_orders","column":"order_id","description":"Surrogate key","data_type":"integer","config":{},"sourceFile":"models/marts/schema.yml"},{"type":"schema","name":"not_null","model":"fct_orders","column":"order_id","description":"Surrogate key","data_type":"integer","config":{},"sourceFile":"models/marts/schema.yml"},{"type":"schema","name":"not_null","model":"fct_orders","column":"customer_id","description":"FK to dim_customers","data_type":"integer","config":{},"sourceFile":"models/marts/schema.yml"},{"type":"schema","name":"relationships","model":"fct_orders","column":"customer_id","description":"FK to dim_customers","data_type":"integer","config":{"to":"ref('dim_customers')","field":"customer_id"},"sourceFile":"models/marts/schema.yml"},{"type":"schema","name":"not_null","model":"fct_orders","column":"order_date","description":"Date the order was placed","data_type":"date","config":{},"sourceFile":"models/marts/schema.yml"},{"type":"schema","name":"accepted_values","model":"fct_orders","column":"status","description":"Order fulfillment status","data_type":"varchar","config":{"values":["pending","shipped","delivered","returned","cancelled"]},"sourceFile":"models/marts/schema.yml"},{"type":"schema","name":"not_null","model":"fct_orders","column":"total","description":"Calculated order total","data_type":"numeric","config":{},"sourceFile":"models/marts/schema.yml"},{"type":"schema","name":"dbt_utils.accepted_range","model":"fct_orders","column":"total","description":"Calculated order total","data_type":"numeric","config":{"min_value":0,"inclusive":true},"sourceFile":"models/marts/schema.yml"},{"type":"schema","name":"dbt_utils.unique_combination_of_columns","model":"fct_orders","column":"(model-level)","description":"","data_type":null,"config":{"combination_of_columns":["order_id","order_date"]},"sourceFile":"models/marts/schema.yml"},{"type":"schema","name":"unique","model":"dim_customers","column":"customer_id","description":"Primary key","data_type":"integer","config":{},"sourceFile":"models/marts/schema.yml"},{"type":"schema","name":"not_null","model":"dim_customers","column":"customer_id","description":"Primary key","data_type":"integer","config":{},"sourceFile":"models/marts/schema.yml"},{"type":"schema","name":"not_null","model":"dim_customers","column":"customer_name","description":"Full name","data_type":"varchar","config":{},"sourceFile":"models/marts/schema.yml"},{"type":"schema","name":"not_null","model":"dim_customers","column":"email","description":"Contact email","data_type":"varchar","config":{},"sourceFile":"models/marts/schema.yml"},{"type":"schema","name":"unique","model":"dim_customers","column":"email","description":"Contact email","data_type":"varchar","config":{},"sourceFile":"models/marts/schema.yml"},{"type":"unit","name":"test_order_total_calculation","model":"fct_orders","description":"Verify that order total = qty * unit_price with discount applied","given":[{"input":"ref('stg_orders')","rows":[{"order_id":1,"customer_id":101,"qty":3,"unit_price":29.99,"discount":0.1,"status":"shipped"},{"order_id":2,"customer_id":102,"qty":1,"unit_price":99,"discount":null,"status":"pending"},{"order_id":3,"customer_id":101,"qty":2,"unit_price":15.5,"discount":0,"status":"returned"}],"fixture":null}],"expect":[{"order_id":1,"total":80.97},{"order_id":2,"total":99},{"order_id":3,"total":31}],"sourceFile":"models/marts/unit_tests.yml","branchAnalysis":[{"type":"case_when","condition":"status = 'returned'","line":14,"columns":["status"],"covered":true,"coverageNote":"possibly covered"},{"type":"case_when","condition":"status = 'pending'","line":15,"columns":["status"],"covered":true,"coverageNote":"possibly covered"},{"type":"case_else","condition":"ELSE","line":16,"columns":[],"covered":false,"coverageNote":"ELSE reachability not analysed"},{"type":"coalesce","condition":"discount IS NULL","line":12,"columns":["discount"],"covered":true,"coverageNote":"possibly covered"},{"type":"coalesce","condition":"discount IS NULL","line":16,"columns":["discount"],"covered":true,"coverageNote":"possibly covered"}],"branchSourceFile":"models/marts/fct_orders.sql"},{"type":"data","name":"assert_no_orphan_orders","description":"All orders must have a valid customer","sql":"-- name: assert_no_orphan_orders\n-- description: All orders must have a valid customer\n\nWITH orders AS (\n    SELECT * FROM {{ ref('fct_orders') }}\n),\ncustomers AS (\n    SELECT * FROM {{ ref('dim_customers') }}\n)\n\nSELECT o.order_id\nFROM orders o\nLEFT JOIN customers c ON o.customer_id = c.customer_id\nWHERE c.customer_id IS NULL\n","inputs":["fct_orders","dim_customers"],"sourceFile":"tests/assert_no_orphan_orders.sql"}],"cteResults":{"models/marts/fct_orders.sql":{"ctes":[{"name":"stg_orders","body":"SELECT * FROM {{ ref('stg_orders') }}","externalRefs":["stg_orders"],"deps":[]},{"name":"calc_totals","body":"SELECT\n        order_id,\n        customer_id,\n        order_date,\n        status,\n        qty * unit_price AS subtotal,\n        COALESCE(discount, 0) AS discount_rate,\n        CASE\n            WHEN status = 'returned' THEN 0\n            WHEN status = 'pending' THEN qty * unit_price\n            ELSE qty * unit_price * (1 - COALESCE(discount, 0))\n        END AS total\n    FROM stg_orders","externalRefs":[],"deps":["stg_orders"]}],"finalSelect":"SELECT\n    order_id,\n    customer_id,\n    order_date,\n    status,\n    total,\n    discount_rate AS discount\nFROM calc_totals","finalDeps":["calc_totals"]},"tests/assert_no_orphan_orders.sql":{"ctes":[{"name":"orders","body":"SELECT * FROM {{ ref('fct_orders') }}","externalRefs":["fct_orders"],"deps":[]},{"name":"customers","body":"SELECT * FROM {{ ref('dim_customers') }}","externalRefs":["dim_customers"],"deps":[]}],"finalSelect":"SELECT o.order_id\nFROM orders o\nLEFT JOIN customers c ON o.customer_id = c.customer_id\nWHERE c.customer_id IS NULL","finalDeps":["orders","customers"]}},"coverageData":[{"model":"fct_orders","columns":[{"name":"order_id","description":"Surrogate key","data_type":"integer","status":"tested","excludeReason":"","testCount":2},{"name":"customer_id","description":"FK to dim_customers","data_type":"integer","status":"tested","excludeReason":"","testCount":2},{"name":"order_date","description":"Date the order was placed","data_type":"date","status":"tested","excludeReason":"","testCount":1},{"name":"status","description":"Order fulfillment status","data_type":"varchar","status":"tested","excludeReason":"","testCount":1},{"name":"total","description":"Calculated order total","data_type":"numeric","status":"tested","excludeReason":"","testCount":2},{"name":"discount","description":"Applied discount rate","data_type":"numeric","status":"untested","excludeReason":"","testCount":0},{"name":"internal_memo","description":"Internal processing note","data_type":"varchar","status":"excluded","excludeReason":"Internal field, not exposed in semantic layer","testCount":0}],"tested":5,"excluded":1,"untested":1,"total":7,"coveragePercent":86,"sourceFile":"models/marts/schema.yml"},{"model":"dim_customers","columns":[{"name":"customer_id","description":"Primary key","data_type":"integer","status":"tested","excludeReason":"","testCount":2},{"name":"customer_name","description":"Full name","data_type":"varchar","status":"tested","excludeReason":"","testCount":1},{"name":"email","description":"Contact email","data_type":"varchar","status":"tested","excludeReason":"","testCount":2},{"name":"signup_date","description":"Registration date","data_type":"date","status":"untested","excludeReason":"","testCount":0}],"tested":3,"excluded":0,"untested":1,"total":4,"coveragePercent":75,"sourceFile":"models/marts/schema.yml"}],"columnMeta":{"fct_orders":{"order_id":{"description":"Surrogate key","data_type":"integer"},"customer_id":{"description":"FK to dim_customers","data_type":"integer"},"order_date":{"description":"Date the order was placed","data_type":"date"},"status":{"description":"Order fulfillment status","data_type":"varchar"},"total":{"description":"Calculated order total","data_type":"numeric"},"discount":{"description":"Applied discount rate","data_type":"numeric"},"internal_memo":{"description":"Internal processing note","data_type":"varchar"}},"dim_customers":{"customer_id":{"description":"Primary key","data_type":"integer"},"customer_name":{"description":"Full name","data_type":"varchar"},"email":{"description":"Contact email","data_type":"varchar"},"signup_date":{"description":"Registration date","data_type":"date"}}},"modelDescriptions":{"fct_orders":"Fact table for orders","dim_customers":"Customer dimension"},"semanticModels":[{"name":"orders_semantic","modelRef":"fct_orders","description":"","defaults":{},"measures":[{"name":"total_revenue","agg":"sum","expr":"total","description":"Total revenue"},{"name":"order_count","agg":"count","expr":"order_id","description":"Number of orders"},{"name":"avg_discount","agg":"average","expr":"discount","description":"Average discount rate"}],"dimensions":[{"name":"order_date","type":"time","typeParams":null,"expr":"order_date","description":""},{"name":"status","type":"categorical","typeParams":null,"expr":"status","description":""}],"entities":[{"name":"order","type":"primary","expr":"order_id"},{"name":"customer","type":"foreign","expr":"customer_id"}],"sourceFile":"models/marts/_semantic.yml"}],"metrics":[{"name":"total_revenue","label":"Total Revenue","description":"Total order revenue","type":"simple","measure":"total_revenue","measureFilter":null,"expr":null,"metrics":[],"filter":null,"typeParams":null,"semanticModel":null,"sourceFile":"models/marts/_metrics.yml"},{"name":"avg_order_value","label":"Avg Order Value","description":"Average value per order","type":"derived","measure":null,"measureFilter":null,"expr":"total_revenue / order_count","metrics":["total_revenue","order_count"],"filter":null,"typeParams":null,"semanticModel":null,"sourceFile":"models/marts/_metrics.yml"}],"semanticWarnings":[{"semanticModel":"orders_semantic","model":"fct_orders","kind":"measure","item":"avg_discount","column":"discount","detail":"agg: average","issue":"no_tests","hint":"measure \"avg_discount\" (agg: average) references column \"discount\" which has no tests"}],"fileContents":{"models/marts/_metrics.yml":"metrics:\n  - name: total_revenue\n    label: \"Total Revenue\"\n    description: \"Total order revenue\"\n    type: simple\n    type_params:\n      measure: total_revenue\n\n  - name: avg_order_value\n    label: \"Avg Order Value\"\n    description: \"Average value per order\"\n    type: derived\n    type_params:\n      expr: total_revenue / order_count\n      metrics:\n        - name: total_revenue\n        - name: order_count\n","models/marts/_semantic.yml":"semantic_models:\n  - name: orders_semantic\n    model: ref('fct_orders')\n    measures:\n      - name: total_revenue\n        agg: sum\n        expr: total\n        description: \"Total revenue\"\n      - name: order_count\n        agg: count\n        expr: order_id\n        description: \"Number of orders\"\n      - name: avg_discount\n        agg: average\n        expr: discount\n        description: \"Average discount rate\"\n    dimensions:\n      - name: order_date\n        type: time\n        expr: order_date\n      - name: status\n        type: categorical\n        expr: status\n    entities:\n      - name: order\n        type: primary\n        expr: order_id\n      - name: customer\n        type: foreign\n        expr: customer_id\n","models/marts/fct_orders.sql":"WITH stg_orders AS (\n    SELECT * FROM {{ ref('stg_orders') }}\n),\n\ncalc_totals AS (\n    SELECT\n        order_id,\n        customer_id,\n        order_date,\n        status,\n        qty * unit_price AS subtotal,\n        COALESCE(discount, 0) AS discount_rate,\n        CASE\n            WHEN status = 'returned' THEN 0\n            WHEN status = 'pending' THEN qty * unit_price\n            ELSE qty * unit_price * (1 - COALESCE(discount, 0))\n        END AS total\n    FROM stg_orders\n)\n\nSELECT\n    order_id,\n    customer_id,\n    order_date,\n    status,\n    total,\n    discount_rate AS discount\nFROM calc_totals\n","models/marts/schema.yml":"models:\n  - name: fct_orders\n    description: \"Fact table for orders\"\n    columns:\n      - name: order_id\n        description: \"Surrogate key\"\n        data_type: integer\n        tests:\n          - unique\n          - not_null\n      - name: customer_id\n        description: \"FK to dim_customers\"\n        data_type: integer\n        tests:\n          - not_null\n          - relationships:\n              to: ref('dim_customers')\n              field: customer_id\n      - name: order_date\n        description: \"Date the order was placed\"\n        data_type: date\n        tests:\n          - not_null\n      - name: status\n        description: \"Order fulfillment status\"\n        data_type: varchar\n        tests:\n          - accepted_values:\n              values: [pending, shipped, delivered, returned, cancelled]\n      - name: total\n        description: \"Calculated order total\"\n        data_type: numeric\n        tests:\n          - not_null\n          - dbt_utils.accepted_range:\n              min_value: 0\n              inclusive: true\n      - name: discount\n        description: \"Applied discount rate\"\n        data_type: numeric\n      - name: internal_memo\n        description: \"Internal processing note\"\n        data_type: varchar\n        meta:\n          no_test: true\n          reason: \"Internal field, not exposed in semantic layer\"\n    tests:\n      - dbt_utils.unique_combination_of_columns:\n          combination_of_columns: [order_id, order_date]\n\n  - name: dim_customers\n    description: \"Customer dimension\"\n    columns:\n      - name: customer_id\n        description: \"Primary key\"\n        data_type: integer\n        tests:\n          - unique\n          - not_null\n      - name: customer_name\n        description: \"Full name\"\n        data_type: varchar\n        tests:\n          - not_null\n      - name: email\n        description: \"Contact email\"\n        data_type: varchar\n        tests:\n          - not_null\n          - unique\n      - name: signup_date\n        description: \"Registration date\"\n        data_type: date\n","models/marts/unit_tests.yml":"unit_tests:\n  - name: test_order_total_calculation\n    model: fct_orders\n    description: \"Verify that order total = qty * unit_price with discount applied\"\n    given:\n      - input: ref('stg_orders')\n        rows:\n          - {order_id: 1, customer_id: 101, qty: 3, unit_price: 29.99, discount: 0.1, status: shipped}\n          - {order_id: 2, customer_id: 102, qty: 1, unit_price: 99.00, discount: null, status: pending}\n          - {order_id: 3, customer_id: 101, qty: 2, unit_price: 15.50, discount: 0.0, status: returned}\n    expect:\n      rows:\n        - {order_id: 1, total: 80.97}\n        - {order_id: 2, total: 99.00}\n        - {order_id: 3, total: 31.00}\n","tests/assert_no_orphan_orders.sql":"-- name: assert_no_orphan_orders\n-- description: All orders must have a valid customer\n\nWITH orders AS (\n    SELECT * FROM {{ ref('fct_orders') }}\n),\ncustomers AS (\n    SELECT * FROM {{ ref('dim_customers') }}\n)\n\nSELECT o.order_id\nFROM orders o\nLEFT JOIN customers c ON o.customer_id = c.customer_id\nWHERE c.customer_id IS NULL\n"},"fileCount":6,"parseErrors":[],"context":{"dir":"/home/runner/work/dbt-test-reviewer/dbt-test-reviewer/test/fixtures/demo","gitBranch":"main"},"demoMode":true};
-let reviews = {}, comments = {}, filter = 'all', openSections = {}, selectedFile = null;
+let reviews = {}, comments = {}, filter = 'all', openSections = {}, selectedFile = null, searchQuery = '';
+let searchDebounceTimer = null;
+let renderedSectionIds = [];
 
 function reviewKey(t) {
   if (t.type === 'schema' && t.column !== '(model-level)') return 'col:' + t.model + ':' + t.column;
@@ -242,15 +263,26 @@ function renderSidebar() {
     .sort(([a], [b]) => a.localeCompare(b));
   const semanticItemCount = semanticFileEntries.reduce((sum, [, v]) => sum + v.models.length, 0);
 
+  const q = searchQuery.toLowerCase();
+  const filteredFiles = searchQuery
+    ? files.filter(f => f.path.toLowerCase().includes(q) || f.tests.some(t => testMatchesSearch(t)))
+    : files;
+  const filteredSemanticEntries = searchQuery
+    ? semanticFileEntries.filter(([path, smData]) => path.toLowerCase().includes(q) || smData.models.some(sm => semanticMatchesSearch(sm)))
+    : semanticFileEntries;
+  const displayCount = searchQuery
+    ? filteredFiles.reduce((sum, f) => sum + f.tests.length, 0) + filteredSemanticEntries.reduce((sum, [, v]) => sum + v.models.length, 0)
+    : totalTests + semanticItemCount;
+
   let h = '<div style="position:relative">';
   h += '<button class="sidebar-close" onclick="toggleSidebar()">\u2715</button>';
   h += '<div class="sidebar-header"><span class="sidebar-title">Files</span></div>';
   h += '<div class="sidebar-all' + (!selectedFile ? ' active' : '') + '" onclick="selectFile(null)">';
   h += '<span>All Files</span>';
-  h += '<span class="sidebar-count">' + (totalTests + semanticItemCount) + '</span>';
+  h += '<span class="sidebar-count">' + displayCount + '</span>';
   h += '</div>';
   h += '<div class="sidebar-sep"></div>';
-  for (const file of files) {
+  for (const file of filteredFiles) {
     const ext = file.name.split('.').pop()?.toLowerCase();
     const extLabel = ext === 'yml' || ext === 'yaml' ? 'Y' : ext === 'sql' ? 'S' : '?';
     const extColor = ext === 'sql' ? 'var(--or)' : 'var(--pu)';
@@ -285,11 +317,51 @@ function renderSidebar() {
       h += '<div style="width:' + (fNeedsChange / fTotal * 100) + '%;background:var(--rd)"></div>';
       h += '</div>';
     }
+    // Test list for active file
+    if (isActive && file.tests.length > 0) {
+      h += '<div style="max-height:60vh;overflow-y:auto">';
+      // Group tests by model
+      var byModel = {};
+      file.tests.forEach(function(t) {
+        if (searchQuery && !testMatchesSearch(t)) return;
+        var k = reviewKey(t);
+        if (!byModel[t.model]) byModel[t.model] = {};
+        if (!byModel[t.model][k]) byModel[t.model][k] = t;
+      });
+      // Add coverage columns (untested/excluded) not already in tests
+      var covForFile = (DATA.coverageData || []).filter(function(c) { return c.sourceFile === file.path; });
+      covForFile.forEach(function(cov) {
+        if (!byModel[cov.model]) byModel[cov.model] = {};
+        cov.columns.filter(function(c) { return c.status === 'untested' || c.status === 'excluded'; }).forEach(function(c) {
+          var k = 'col:' + cov.model + ':' + c.name;
+          if (byModel[cov.model][k]) return;
+          if (searchQuery && !covColMatchesSearch(cov.model, c)) return;
+          byModel[cov.model][k] = { type: 'schema', column: c.name, name: c.name, model: cov.model };
+        });
+      });
+      for (var _m in byModel) {
+        if (!byModel.hasOwnProperty(_m)) continue;
+        var _items = byModel[_m];
+        h += '<div class="sidebar-model-label">' + esc(_m) + '</div>';
+        for (var _k in _items) {
+          if (!_items.hasOwnProperty(_k)) continue;
+          var _t = _items[_k];
+          var _st = reviews[_k];
+          var _dot = _st === 'approved' ? 'var(--ac)' : _st === 'needs_change' ? 'var(--rd)' : 'var(--or)';
+          var _label = _t.type === 'schema' && _t.column && _t.column !== '(model-level)' ? _t.column : _t.name;
+          h += '<div class="sidebar-test" onclick="event.stopPropagation();scrollToCard(' + jsStr(_k) + ',' + jsStr(_m) + ')">';
+          h += '<span class="sidebar-dot" style="background:' + _dot + ';flex-shrink:0"></span>';
+          h += '<span class="sidebar-test-name">' + esc(_label) + '</span>';
+          h += '</div>';
+        }
+      }
+      h += '</div>';
+    }
   }
   // Semantic YAML files (not already in test files)
-  if (semanticFileEntries.length > 0) {
+  if (filteredSemanticEntries.length > 0) {
     h += '<div class="sidebar-sep"></div>';
-    for (const [path, smData] of semanticFileEntries) {
+    for (const [path, smData] of filteredSemanticEntries) {
       const parts = path.split('/');
       const name = parts.pop();
       const dir = parts.join('/');
@@ -321,6 +393,19 @@ function renderSidebar() {
         h += '<div style="width:' + (fApproved / fTotal * 100) + '%;background:var(--ac)"></div>';
         h += '<div style="width:' + (fNeedsChange / fTotal * 100) + '%;background:var(--rd)"></div>';
         h += '</div>';
+      }
+      // Semantic model list for active file
+      if (isActive) {
+        smData.models.forEach(function(sm) {
+          if (searchQuery && !semanticMatchesSearch(sm)) return;
+          var k = 'semantic:' + sm.name + ':' + sm.modelRef;
+          var status = reviews[k];
+          var dot = status === 'approved' ? 'var(--ac)' : status === 'needs_change' ? 'var(--rd)' : 'var(--or)';
+          h += '<div class="sidebar-test" onclick="event.stopPropagation();scrollToCard(' + jsStr(k) + ',' + jsStr(sm.modelRef) + ')">';
+          h += '<span class="sidebar-dot" style="background:' + dot + ';flex-shrink:0"></span>';
+          h += '<span class="sidebar-test-name">' + esc(sm.name) + '</span>';
+          h += '</div>';
+        });
       }
     }
   }
@@ -400,12 +485,25 @@ window.openSourcePanel = function(file, targetLine) {
   const lineInfo = targetLine ? '<span style="font-size:10px;color:var(--or);flex-shrink:0">L' + targetLine + '</span>' : '';
   const header = badge +
     '<span style="font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(file.split('/').pop()) + '</span>' + lineInfo;
+  const wasOpen = document.getElementById('right-panel').classList.contains('open');
   openRightPanel(header, body);
   if (targetLine) {
-    setTimeout(function() {
+    const doScroll = function() {
       const el = document.getElementById('src-line-' + targetLine);
-      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }, 50);
+      if (el) el.scrollIntoView({ behavior: 'instant', block: 'center' });
+    };
+    if (wasOpen) {
+      doScroll();
+    } else {
+      const panel = document.getElementById('right-panel');
+      panel.addEventListener('transitionend', function handler(e) {
+        if (e.propertyName === 'width' || e.propertyName === 'transform') {
+          panel.removeEventListener('transitionend', handler);
+          doScroll();
+        }
+      });
+      setTimeout(doScroll, 350);
+    }
   }
 };
 
@@ -512,6 +610,7 @@ function initReviewKeys(data) {
   data.allTests.forEach(t => {
     const k = reviewKey(t);
     if (!reviews[k]) { reviews[k] = 'pending'; comments[k] = ''; }
+    t._searchText = [t.name, t.model, t.column, t.description].filter(Boolean).join(' ').toLowerCase();
   });
   if (data.coverageData) {
     data.coverageData.forEach(cov => {
@@ -525,6 +624,11 @@ function initReviewKeys(data) {
     data.semanticModels.forEach(sm => {
       const k = 'semantic:' + sm.name + ':' + sm.modelRef;
       if (!reviews[k]) { reviews[k] = 'pending'; comments[k] = ''; }
+      const parts = [sm.name, sm.description, sm.modelRef];
+      if (sm.measures) sm.measures.forEach(m => parts.push(m.name));
+      if (sm.dimensions) sm.dimensions.forEach(d => parts.push(d.name));
+      if (sm.entities) sm.entities.forEach(e => parts.push(e.name));
+      sm._searchText = parts.filter(Boolean).join(' ').toLowerCase();
     });
   }
 }
@@ -544,6 +648,7 @@ async function poll() {
     if (JSON.stringify(d) !== JSON.stringify(DATA)) {
       DATA = d;
       initReviewKeys(DATA);
+      clearTimeout(searchDebounceTimer);
       render(); renderSidebar();
     }
   } catch (e) {
@@ -855,7 +960,23 @@ function matchFilter(key, type) {
   return reviews[key] === filter;
 }
 
+function testMatchesSearch(t) {
+  if (!searchQuery) return true;
+  return t._searchText ? t._searchText.includes(searchQuery) : true;
+}
+
+function semanticMatchesSearch(sm) {
+  if (!searchQuery) return true;
+  return sm._searchText ? sm._searchText.includes(searchQuery) : true;
+}
+
+function covColMatchesSearch(modelName, col) {
+  if (!searchQuery) return true;
+  return [modelName, col.name, col.description, col.data_type].filter(Boolean).join(' ').toLowerCase().includes(searchQuery);
+}
+
 function render() {
+  renderedSectionIds = [];
   const tests = selectedFile ? DATA.allTests.filter(t => t.sourceFile === selectedFile) : DATA.allTests;
   const coverage = selectedFile ? (DATA.coverageData || []).filter(c => c.sourceFile === selectedFile) : (DATA.coverageData || []);
   const fileSM = selectedFile ? (DATA.semanticModels || []).filter(sm => sm.sourceFile === selectedFile) : (DATA.semanticModels || []);
@@ -927,6 +1048,10 @@ function render() {
     const style = active ? 'color:var(--bg);background:var(' + c + ');border-color:var(' + c + ')' : '';
     h += '<button class="' + (active ? 'active' : '') + '" style="' + style + '" onclick="setFilter(\'' + k + '\')">' + label + '</button>';
   });
+  h += '<span style="margin-left:auto;display:flex;gap:4px">';
+  h += '<button style="font-size:11px;padding:3px 8px" onclick="expandAll()">&#9660; Expand All</button>';
+  h += '<button style="font-size:11px;padding:3px 8px" onclick="collapseAll()">&#9650; Collapse All</button>';
+  h += '</span>';
   h += '</div>';
 
   h += '<div class="progress" style="margin-bottom:0">';
@@ -941,7 +1066,9 @@ function render() {
   h += '</div>';
   h += '<div style="padding:16px">';
 
-  const models = groupByModel(tests);
+  const q = searchQuery.toLowerCase();
+  const searchedTests = searchQuery ? tests.filter(t => testMatchesSearch(t)) : tests;
+  const models = groupByModel(searchedTests);
 
   // Add model groups for semantic models and coverage in this file
   fileSM.forEach(sm => {
@@ -952,8 +1079,10 @@ function render() {
     if (!models[cov.model]) models[cov.model] = { unit: [], schema: [], data: [], modelLevel: [] };
   });
 
+  let hasVisibleContent = false;
   for (const [modelName, group] of Object.entries(models)) {
     const modelId = 'model_' + modelName.replace(/[^a-zA-Z0-9]/g, '_');
+    renderedSectionIds.push(modelId);
     const cov = coverage.find(c => c.model === modelName);
     const testCount = group.unit.length + group.schema.length + group.data.length + group.modelLevel.length;
 
@@ -971,6 +1100,17 @@ function render() {
       if (!hasUnit && !hasSchema && !hasData && !hasSemantic && !hasStatus) continue;
     }
 
+    // Skip model group if nothing matches search
+    if (searchQuery) {
+      const modelMatches = modelName.toLowerCase().includes(q)
+        || ((DATA.modelDescriptions || {})[modelName] || '').toLowerCase().includes(q);
+      const anyTestMatches = [...group.unit, ...group.schema, ...group.data, ...group.modelLevel].some(t => testMatchesSearch(t));
+      const anyCovMatches = cov ? cov.columns.some(c => covColMatchesSearch(modelName, c)) : false;
+      const anySmMatches = fileSM.filter(sm => sm.modelRef === modelName).some(sm => semanticMatchesSearch(sm));
+      if (!modelMatches && !anyTestMatches && !anyCovMatches && !anySmMatches) continue;
+    }
+
+    hasVisibleContent = true;
     const isOpen = openSections[modelId] !== false;
 
     // Check for CTE data for this model
@@ -1018,7 +1158,9 @@ function render() {
     for (const test of group.unit) {
       const key = reviewKey(test);
       if (!matchFilter(key, 'unit')) continue;
+      if (searchQuery && !testMatchesSearch(test)) continue;
       const cardId = 'card_' + key.replace(/[^a-zA-Z0-9]/g, '_');
+      renderedSectionIds.push(cardId);
       const cardOpen = openSections[cardId] !== false;
       h += '<div class="card" data-review-key="' + esc(key) + '" onclick="focusCard(this)" style="' + cardBorderStyle(key) + '">';
       h += '<div class="card-head clickable with-border" onclick="toggleSection(\'' + cardId + '\')">';
@@ -1039,40 +1181,61 @@ function render() {
       h += '<div class="section-label" style="color:var(--ac)">\u2191 EXPECTED OUTPUT</div>';
       h += '<div class="tbl-wrap">' + renderTable(test.expect, 'var(--ac)', 'expect \u2014 ' + test.expect.length + ' rows') + '</div>';
 
-      // Branch coverage analysis
-      if (test.branchAnalysis?.length) {
-        const uncovered = test.branchAnalysis.filter(b => !b.covered);
-        const total = test.branchAnalysis.length;
-        const covered = total - uncovered.length;
-        h += '<div class="separator"></div>';
-        h += '<div class="section-label" style="color:' + (uncovered.length ? 'var(--or)' : 'var(--ac)') + '">';
-        h += '\u2194 BRANCH COVERAGE (' + covered + '/' + total + ')</div>';
+      h += renderComment(key);
+      h += '</div></div>';
+    }
+
+    // Branch coverage (merged across all unit tests for this model)
+    if (filter === 'all' || filter === 'unit') {
+      const testsWithBranches = group.unit.filter(t => t.branchAnalysis?.length);
+      if (testsWithBranches.length) {
+        const base = testsWithBranches[0].branchAnalysis;
+        const branchSourceFile = testsWithBranches[0].branchSourceFile;
+        const merged = base.map((b, i) => {
+          const covered = testsWithBranches.some(t => t.branchAnalysis[i]?.covered);
+          return { ...b, covered, coverageNote: covered ? '' : b.coverageNote };
+        });
+        const uncovered = merged.filter(b => !b.covered);
+        const total = merged.length;
+        const covCount = total - uncovered.length;
+        const branchId = 'branch_' + modelName.replace(/[^a-zA-Z0-9]/g, '_');
+        renderedSectionIds.push(branchId);
+        const branchOpen = openSections[branchId] !== false;
+        const badgeColor = uncovered.length ? 'var(--or)' : 'var(--ac)';
+        const badgeBg = uncovered.length ? 'var(--orb)' : 'var(--acb)';
+        h += '<div class="card" style="border-color:' + badgeColor + '">';
+        h += '<div class="card-head clickable with-border" onclick="toggleSection(\'' + branchId + '\')">';
+        h += '<div style="display:flex;align-items:center;gap:10px">';
+        h += '<span class="arrow ' + (branchOpen ? 'open' : '') + '">\u25B6</span>';
+        h += '<span class="badge" style="color:' + badgeColor + ';background:' + badgeBg + '">Branch Coverage</span>';
+        h += '<span class="card-dim">' + covCount + '/' + total + ' branches covered</span>';
+        h += '</div></div>';
+        h += '<div class="card-body ' + (branchOpen ? 'open' : '') + '" id="' + branchId + '">';
         h += '<div style="padding:4px 18px 10px;display:flex;flex-direction:column;gap:4px">';
-        test.branchAnalysis.forEach(b => {
+        merged.forEach(b => {
           const color = b.covered ? 'var(--ac)' : 'var(--or)';
           const icon = b.covered ? '\u2713' : '\u2717';
-          const clickable = b.line && test.branchSourceFile;
-          const onclick = clickable ? ' onclick="openSourcePanel(' + jsStr(test.branchSourceFile) + ',' + b.line + ')" style="cursor:pointer;font-size:12px;font-family:var(--fn);display:flex;gap:8px;align-items:baseline;padding:2px 0;border-radius:3px;transition:background .1s" onmouseover="this.style.background=\'var(--sf2)\'" onmouseout="this.style.background=\'transparent\'"' : ' style="font-size:12px;font-family:var(--fn);display:flex;gap:8px;align-items:baseline;padding:2px 0"';
+          const clickable = b.line && branchSourceFile;
+          const onclick = clickable ? ' onclick="openSourcePanel(' + jsStr(branchSourceFile) + ',' + b.line + ')" style="cursor:pointer;font-size:12px;font-family:var(--fn);display:flex;gap:8px;align-items:baseline;padding:2px 0;border-radius:3px;transition:background .1s" onmouseover="this.style.background=\'var(--sf2)\'" onmouseout="this.style.background=\'transparent\'"' : ' style="font-size:12px;font-family:var(--fn);display:flex;gap:8px;align-items:baseline;padding:2px 0"';
           h += '<div' + onclick + '>';
           h += '<span style="color:' + color + '">' + icon + '</span>';
           h += '<span class="badge" style="color:var(--txm);background:var(--sf2);font-size:10px">' + esc(b.type) + '</span>';
           h += '<code style="color:var(--bl);font-size:12px">' + esc(b.condition) + '</code>';
-          if (b.line) { const bsf = test.branchSourceFile ? esc(test.branchSourceFile.split('/').pop()) + ':' : ''; h += '<span style="color:var(--txm);font-size:10px;font-family:var(--fn)">' + bsf + b.line + '</span>'; }
+          if (b.line) { const bsf = branchSourceFile ? esc(branchSourceFile.split('/').pop()) + ':' : ''; h += '<span style="color:var(--txm);font-size:10px;font-family:var(--fn)">' + bsf + b.line + '</span>'; }
           if (!b.covered) h += '<span style="color:var(--txm);font-size:11px;font-style:italic">' + esc(b.coverageNote) + '</span>';
           h += '</div>';
         });
-        h += '</div>';
+        h += '</div></div></div>';
       }
-
-      h += renderComment(key);
-      h += '</div></div>';
     }
 
     // Data tests
     for (const test of group.data) {
       const key = reviewKey(test);
       if (!matchFilter(key, 'data')) continue;
+      if (searchQuery && !testMatchesSearch(test)) continue;
       const cardId = 'card_' + key.replace(/[^a-zA-Z0-9]/g, '_');
+      renderedSectionIds.push(cardId);
       const cardOpen = openSections[cardId] !== false;
       h += '<div class="card" data-review-key="' + esc(key) + '" onclick="focusCard(this)" style="' + cardBorderStyle(key) + '">';
       h += '<div class="card-head clickable with-border" onclick="toggleSection(\'' + cardId + '\')">';
@@ -1097,6 +1260,7 @@ function render() {
     for (const test of group.modelLevel) {
       const key = reviewKey(test);
       if (!matchFilter(key, 'schema')) continue;
+      if (searchQuery && !testMatchesSearch(test)) continue;
       const isUtils = test.name.startsWith('dbt_utils.');
       const displayName = isUtils ? test.name.replace('dbt_utils.', '') : test.name;
       h += '<div class="card" data-review-key="' + esc(key) + '" onclick="focusCard(this)" style="' + cardBorderStyle(key) + '"><div class="card-head"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">';
@@ -1114,6 +1278,12 @@ function render() {
     for (const [colName, colGroup] of Object.entries(colGroups)) {
       const key = 'col:' + modelName + ':' + colName;
       if (!matchFilter(key, 'schema')) continue;
+      if (searchQuery) {
+        const colMatches = colName.toLowerCase().includes(q) || modelName.toLowerCase().includes(q)
+          || colGroup.tests.some(t => testMatchesSearch(t))
+          || (colGroup.description || '').toLowerCase().includes(q);
+        if (!colMatches) continue;
+      }
 
       h += '<div class="card" data-review-key="' + esc(key) + '" onclick="focusCard(this)" style="' + cardBorderStyle(key) + '">';
       h += '<div class="card-head"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">';
@@ -1153,6 +1323,7 @@ function render() {
         if (colGroups[col.name]) continue;
         const key = 'col:' + modelName + ':' + col.name;
         if (!matchFilter(key, 'schema')) continue;
+        if (searchQuery && !covColMatchesSearch(modelName, col)) continue;
         h += '<div class="card untested" data-review-key="' + esc(key) + '" onclick="focusCard(this)" style="' + cardBorderStyle(key) + '">';
         h += '<div class="card-head"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">';
         h += '<span class="badge" style="color:var(--or);background:var(--orb)">Untested</span>';
@@ -1175,6 +1346,7 @@ function render() {
         if (colGroups[col.name]) continue;
         const key = 'col:' + modelName + ':' + col.name;
         if (!matchFilter(key, 'schema')) continue;
+        if (searchQuery && !covColMatchesSearch(modelName, col)) continue;
         h += '<div class="card" data-review-key="' + esc(key) + '" onclick="focusCard(this)" style="border-color:var(--txm);' + cardBorderStyle(key) + '">';
         h += '<div class="card-head"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">';
         h += '<span class="badge" style="color:var(--txm);background:var(--sf2)">Excluded</span>';
@@ -1195,6 +1367,7 @@ function render() {
     // Coverage summary
     if (cov) {
       const covId = 'cov_' + modelName.replace(/[^a-zA-Z0-9]/g, '_');
+      renderedSectionIds.push(covId);
       const covOpen = openSections[covId] === true;
       h += '<div class="cov-summary">';
       h += '<div class="cov-head" onclick="toggleSection(\'' + covId + '\')">';
@@ -1473,7 +1646,18 @@ function render() {
     h += '</div></div>';
   }
 
-  if (!Object.keys(models).length) h += '<div style="text-align:center;padding:40px;color:var(--txm)">No matching items</div>';
+  if (!hasVisibleContent) {
+    if (searchQuery) {
+      h += '<div style="text-align:center;padding:40px;color:var(--txm)">';
+      h += '<div style="font-size:14px;margin-bottom:8px">No results for "<span style="color:var(--bl)">' + esc(searchQuery) + '</span>"</div>';
+      h += '<div style="font-size:12px">';
+      if (selectedFile) h += '<a href="#" onclick="selectedFile=null;render();renderSidebar();return false" style="color:var(--bl);text-decoration:underline">Search all files</a> or ';
+      h += '<a href="#" onclick="clearSearch();return false" style="color:var(--bl);text-decoration:underline">Clear search</a></div>';
+      h += '</div>';
+    } else {
+      h += '<div style="text-align:center;padding:40px;color:var(--txm)">No matching items</div>';
+    }
+  }
 
 
   h += renderExportPanel(stats);
@@ -1584,6 +1768,28 @@ function generatePrompt() {
 window.setReview = function(key, status) { reviews[key] = status; render(); };
 window.setComment = function(key, val) { comments[key] = val; };
 window.setFilter = function(f) { filter = f; render(); };
+window.expandAll = function() {
+  renderedSectionIds.forEach(function(id) { openSections[id] = true; });
+  render();
+};
+window.collapseAll = function() {
+  renderedSectionIds.forEach(function(id) { openSections[id] = false; });
+  render();
+};
+window.scrollToCard = function(key, modelName) {
+  if (modelName) {
+    var modelId = 'model_' + modelName.replace(/[^a-zA-Z0-9]/g, '_');
+    if (openSections[modelId] === false) {
+      openSections[modelId] = true;
+      render();
+    }
+  }
+  var card = document.querySelector('.card[data-review-key="' + CSS.escape(key) + '"]');
+  if (card) {
+    card.scrollIntoView({ behavior: 'instant', block: 'center' });
+    focusCard(card);
+  }
+};
 window.toggleSection = function(id) {
   if (openSections[id] === undefined) {
     // Coverage sections (cov_*) default closed, all others default open
@@ -1614,6 +1820,47 @@ window.copyPrompt = async function() {
 };
 
 
+window.onSearchInput = function(value) {
+  const clearBtn = document.getElementById('search-clear');
+  const kbdHint = document.getElementById('search-kbd');
+  if (clearBtn) clearBtn.style.display = value ? 'block' : 'none';
+  if (kbdHint) kbdHint.style.display = value ? 'none' : 'block';
+  clearTimeout(searchDebounceTimer);
+  searchDebounceTimer = setTimeout(function() {
+    searchQuery = value.trim().toLowerCase();
+    render();
+  }, 150);
+};
+
+window.onSearchKeydown = function(e) {
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    const input = document.getElementById('search-input');
+    if (input && input.value) {
+      input.value = '';
+      searchQuery = '';
+      const clearBtn = document.getElementById('search-clear');
+      const kbdHint = document.getElementById('search-kbd');
+      if (clearBtn) clearBtn.style.display = 'none';
+      if (kbdHint) kbdHint.style.display = 'block';
+      render();
+    } else if (input) {
+      input.blur();
+    }
+  }
+};
+
+window.clearSearch = function() {
+  searchQuery = '';
+  const input = document.getElementById('search-input');
+  if (input) input.value = '';
+  const clearBtn = document.getElementById('search-clear');
+  const kbdHint = document.getElementById('search-kbd');
+  if (clearBtn) clearBtn.style.display = 'none';
+  if (kbdHint) kbdHint.style.display = 'block';
+  render();
+};
+
 let focusedCardIndex = -1;
 const getReviewCards = () => [...document.querySelectorAll('.card[data-review-key]')];
 
@@ -1627,11 +1874,24 @@ window.focusCard = function(el) {
 };
 
 document.addEventListener('keydown', function(e) {
+  // Cmd+K / Ctrl+K: always focus search (even from inputs)
+  if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+    e.preventDefault();
+    const input = document.getElementById('search-input');
+    if (input) { input.focus(); input.select(); }
+    return;
+  }
   if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') return;
   const cards = getReviewCards();
-  if (e.key === '?' || e.key === '/') {
+  if (e.key === '?') {
     const help = document.getElementById('kbd-help');
     if (help) help.style.display = help.style.display === 'none' ? 'block' : 'none';
+    return;
+  }
+  if (e.key === '/') {
+    e.preventDefault();
+    const input = document.getElementById('search-input');
+    if (input) { input.focus(); input.select(); }
     return;
   }
   if (e.key === 'b') { toggleSidebarCollapse(); return; }
