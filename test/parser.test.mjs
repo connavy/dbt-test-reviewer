@@ -490,6 +490,41 @@ FROM t
     const sql = `SELECT id, name FROM users WHERE active = true`;
     deepStrictEqual(extractBranches(sql), []);
   });
+
+  it("assigns caseGroupId to WHEN and ELSE in same CASE block", () => {
+    const sql = "SELECT CASE WHEN status = 'a' THEN 1 WHEN status = 'b' THEN 2 ELSE 3 END";
+    const branches = extractBranches(sql);
+    const whens = branches.filter(b => b.type === "case_when");
+    const elses = branches.filter(b => b.type === "case_else");
+    assert.equal(whens.length, 2);
+    assert.equal(elses.length, 1);
+    assert.equal(whens[0].caseGroupId, whens[1].caseGroupId);
+    assert.equal(whens[0].caseGroupId, elses[0].caseGroupId);
+  });
+
+  it("assigns different caseGroupId to separate CASE blocks", () => {
+    const sql = "SELECT CASE WHEN a = 1 THEN 'x' ELSE 'y' END, CASE WHEN b = 2 THEN 'p' ELSE 'q' END";
+    const branches = extractBranches(sql);
+    const elses = branches.filter(b => b.type === "case_else");
+    assert.equal(elses.length, 2);
+    assert.notEqual(elses[0].caseGroupId, elses[1].caseGroupId);
+  });
+
+  it("handles nested CASE blocks correctly", () => {
+    const sql = "SELECT CASE WHEN a = 1 THEN CASE WHEN b = 2 THEN 'x' ELSE 'y' END ELSE 'z' END";
+    const branches = extractBranches(sql);
+    const elses = branches.filter(b => b.type === "case_else");
+    assert.equal(elses.length, 2);
+    assert.notEqual(elses[0].caseGroupId, elses[1].caseGroupId);
+  });
+
+  it("does not assign caseGroupId to COALESCE or IIF branches", () => {
+    const sql = "SELECT COALESCE(a, b), IIF(c > 0, 'yes', 'no')";
+    const branches = extractBranches(sql);
+    for (const b of branches) {
+      assert.equal(b.caseGroupId, undefined);
+    }
+  });
 });
 
 /* ═══════════════════════════════════════════════
@@ -708,6 +743,43 @@ describe("analyzeBranchCoverage", () => {
     assert.equal(result.length, 1);
     assert.equal(result[0].covered, false);
     assert.equal(result[0].coverageNote, "column not in given rows");
+  });
+
+  it("ELSE covered when given rows have values not matching any WHEN", () => {
+    const branches = [
+      { type: "case_when", condition: "member_type_cd = '12'", caseGroupId: 0 },
+      { type: "case_else", condition: "ELSE", caseGroupId: 0 },
+    ];
+    const givenRows = [{ member_type_cd: "01" }, { member_type_cd: "12" }];
+    const result = analyzeBranchCoverage(branches, givenRows);
+    const elseResult = result.find(r => r.type === "case_else");
+    assert.equal(elseResult.covered, true);
+    assert.equal(elseResult.coverageNote, "ELSE possibly covered");
+  });
+
+  it("ELSE not covered when all given rows match WHEN conditions", () => {
+    const branches = [
+      { type: "case_when", condition: "status = 'active'", caseGroupId: 0 },
+      { type: "case_when", condition: "status = 'inactive'", caseGroupId: 0 },
+      { type: "case_else", condition: "ELSE", caseGroupId: 0 },
+    ];
+    const givenRows = [{ status: "active" }, { status: "inactive" }];
+    const result = analyzeBranchCoverage(branches, givenRows);
+    const elseResult = result.find(r => r.type === "case_else");
+    assert.equal(elseResult.covered, false);
+    assert.equal(elseResult.coverageNote, "all given values match WHEN conditions");
+  });
+
+  it("ELSE falls back when WHEN conditions are not simple equality", () => {
+    const branches = [
+      { type: "case_when", condition: "amount > 100", caseGroupId: 0 },
+      { type: "case_else", condition: "ELSE", caseGroupId: 0 },
+    ];
+    const givenRows = [{ amount: "50" }];
+    const result = analyzeBranchCoverage(branches, givenRows);
+    const elseResult = result.find(r => r.type === "case_else");
+    assert.equal(elseResult.covered, false);
+    assert.equal(elseResult.coverageNote, "ELSE reachability not analysed");
   });
 });
 
