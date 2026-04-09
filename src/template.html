@@ -104,6 +104,10 @@ html.light .yaml-key{color:#cf222e}html.light .yaml-str{color:#0a3069}html.light
 .sidebar-count{font-size:10px;color:var(--txm);background:var(--sf2);padding:1px 6px;border-radius:8px}
 .sidebar-dot{width:6px;height:6px;border-radius:50%}
 .sidebar-sep{height:1px;background:var(--bd);margin:6px 12px}
+.sidebar-test{display:flex;align-items:center;gap:6px;padding:3px 12px 3px 24px;font-size:11px;cursor:pointer;color:var(--txd);transition:background .1s}
+.sidebar-test:hover{background:var(--sf2)}
+.sidebar-test-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--fn)}
+.sidebar-model-label{padding:4px 12px 2px 18px;font-size:10px;font-weight:600;color:var(--txm);font-family:var(--fn)}
 .search-container{position:relative;display:flex;align-items:center;flex:1;max-width:360px;min-width:180px;margin:0 12px;background:var(--bg);border:1px solid var(--bd);border-radius:6px;padding:0 8px;transition:border-color .15s,box-shadow .15s}
 .search-container:focus-within{border-color:var(--bl);box-shadow:0 0 0 1px var(--bl)}
 .search-icon{color:var(--txm);font-size:14px;flex-shrink:0;margin-right:6px;pointer-events:none}
@@ -185,6 +189,7 @@ const POLL_INTERVAL = 2000;
 let DATA = <!-- DATA_PLACEHOLDER -->;
 let reviews = {}, comments = {}, filter = 'all', openSections = {}, selectedFile = null, searchQuery = '';
 let searchDebounceTimer = null;
+let renderedSectionIds = [];
 
 function reviewKey(t) {
   if (t.type === 'schema' && t.column !== '(model-level)') return 'col:' + t.model + ':' + t.column;
@@ -312,6 +317,46 @@ function renderSidebar() {
       h += '<div style="width:' + (fNeedsChange / fTotal * 100) + '%;background:var(--rd)"></div>';
       h += '</div>';
     }
+    // Test list for active file
+    if (isActive && file.tests.length > 0) {
+      h += '<div style="max-height:60vh;overflow-y:auto">';
+      // Group tests by model
+      var byModel = {};
+      file.tests.forEach(function(t) {
+        if (searchQuery && !testMatchesSearch(t)) return;
+        var k = reviewKey(t);
+        if (!byModel[t.model]) byModel[t.model] = {};
+        if (!byModel[t.model][k]) byModel[t.model][k] = t;
+      });
+      // Add coverage columns (untested/excluded) not already in tests
+      var covForFile = (DATA.coverageData || []).filter(function(c) { return c.sourceFile === file.path; });
+      covForFile.forEach(function(cov) {
+        if (!byModel[cov.model]) byModel[cov.model] = {};
+        cov.columns.filter(function(c) { return c.status === 'untested' || c.status === 'excluded'; }).forEach(function(c) {
+          var k = 'col:' + cov.model + ':' + c.name;
+          if (byModel[cov.model][k]) return;
+          if (searchQuery && !covColMatchesSearch(cov.model, c)) return;
+          byModel[cov.model][k] = { type: 'schema', column: c.name, name: c.name, model: cov.model };
+        });
+      });
+      for (var _m in byModel) {
+        if (!byModel.hasOwnProperty(_m)) continue;
+        var _items = byModel[_m];
+        h += '<div class="sidebar-model-label">' + esc(_m) + '</div>';
+        for (var _k in _items) {
+          if (!_items.hasOwnProperty(_k)) continue;
+          var _t = _items[_k];
+          var _st = reviews[_k];
+          var _dot = _st === 'approved' ? 'var(--ac)' : _st === 'needs_change' ? 'var(--rd)' : 'var(--or)';
+          var _label = _t.type === 'schema' && _t.column && _t.column !== '(model-level)' ? _t.column : _t.name;
+          h += '<div class="sidebar-test" onclick="event.stopPropagation();scrollToCard(' + jsStr(_k) + ',' + jsStr(_m) + ')">';
+          h += '<span class="sidebar-dot" style="background:' + _dot + ';flex-shrink:0"></span>';
+          h += '<span class="sidebar-test-name">' + esc(_label) + '</span>';
+          h += '</div>';
+        }
+      }
+      h += '</div>';
+    }
   }
   // Semantic YAML files (not already in test files)
   if (filteredSemanticEntries.length > 0) {
@@ -348,6 +393,19 @@ function renderSidebar() {
         h += '<div style="width:' + (fApproved / fTotal * 100) + '%;background:var(--ac)"></div>';
         h += '<div style="width:' + (fNeedsChange / fTotal * 100) + '%;background:var(--rd)"></div>';
         h += '</div>';
+      }
+      // Semantic model list for active file
+      if (isActive) {
+        smData.models.forEach(function(sm) {
+          if (searchQuery && !semanticMatchesSearch(sm)) return;
+          var k = 'semantic:' + sm.name + ':' + sm.modelRef;
+          var status = reviews[k];
+          var dot = status === 'approved' ? 'var(--ac)' : status === 'needs_change' ? 'var(--rd)' : 'var(--or)';
+          h += '<div class="sidebar-test" onclick="event.stopPropagation();scrollToCard(' + jsStr(k) + ',' + jsStr(sm.modelRef) + ')">';
+          h += '<span class="sidebar-dot" style="background:' + dot + ';flex-shrink:0"></span>';
+          h += '<span class="sidebar-test-name">' + esc(sm.name) + '</span>';
+          h += '</div>';
+        });
       }
     }
   }
@@ -918,6 +976,7 @@ function covColMatchesSearch(modelName, col) {
 }
 
 function render() {
+  renderedSectionIds = [];
   const tests = selectedFile ? DATA.allTests.filter(t => t.sourceFile === selectedFile) : DATA.allTests;
   const coverage = selectedFile ? (DATA.coverageData || []).filter(c => c.sourceFile === selectedFile) : (DATA.coverageData || []);
   const fileSM = selectedFile ? (DATA.semanticModels || []).filter(sm => sm.sourceFile === selectedFile) : (DATA.semanticModels || []);
@@ -989,6 +1048,10 @@ function render() {
     const style = active ? 'color:var(--bg);background:var(' + c + ');border-color:var(' + c + ')' : '';
     h += '<button class="' + (active ? 'active' : '') + '" style="' + style + '" onclick="setFilter(\'' + k + '\')">' + label + '</button>';
   });
+  h += '<span style="margin-left:auto;display:flex;gap:4px">';
+  h += '<button style="font-size:11px;padding:3px 8px" onclick="expandAll()">&#9660; Expand All</button>';
+  h += '<button style="font-size:11px;padding:3px 8px" onclick="collapseAll()">&#9650; Collapse All</button>';
+  h += '</span>';
   h += '</div>';
 
   h += '<div class="progress" style="margin-bottom:0">';
@@ -1019,6 +1082,7 @@ function render() {
   let hasVisibleContent = false;
   for (const [modelName, group] of Object.entries(models)) {
     const modelId = 'model_' + modelName.replace(/[^a-zA-Z0-9]/g, '_');
+    renderedSectionIds.push(modelId);
     const cov = coverage.find(c => c.model === modelName);
     const testCount = group.unit.length + group.schema.length + group.data.length + group.modelLevel.length;
 
@@ -1096,6 +1160,7 @@ function render() {
       if (!matchFilter(key, 'unit')) continue;
       if (searchQuery && !testMatchesSearch(test)) continue;
       const cardId = 'card_' + key.replace(/[^a-zA-Z0-9]/g, '_');
+      renderedSectionIds.push(cardId);
       const cardOpen = openSections[cardId] !== false;
       h += '<div class="card" data-review-key="' + esc(key) + '" onclick="focusCard(this)" style="' + cardBorderStyle(key) + '">';
       h += '<div class="card-head clickable with-border" onclick="toggleSection(\'' + cardId + '\')">';
@@ -1116,33 +1181,52 @@ function render() {
       h += '<div class="section-label" style="color:var(--ac)">\u2191 EXPECTED OUTPUT</div>';
       h += '<div class="tbl-wrap">' + renderTable(test.expect, 'var(--ac)', 'expect \u2014 ' + test.expect.length + ' rows') + '</div>';
 
-      // Branch coverage analysis
-      if (test.branchAnalysis?.length) {
-        const uncovered = test.branchAnalysis.filter(b => !b.covered);
-        const total = test.branchAnalysis.length;
-        const covered = total - uncovered.length;
-        h += '<div class="separator"></div>';
-        h += '<div class="section-label" style="color:' + (uncovered.length ? 'var(--or)' : 'var(--ac)') + '">';
-        h += '\u2194 BRANCH COVERAGE (' + covered + '/' + total + ')</div>';
+      h += renderComment(key);
+      h += '</div></div>';
+    }
+
+    // Branch coverage (merged across all unit tests for this model)
+    if (filter === 'all' || filter === 'unit') {
+      const testsWithBranches = group.unit.filter(t => t.branchAnalysis?.length);
+      if (testsWithBranches.length) {
+        const base = testsWithBranches[0].branchAnalysis;
+        const branchSourceFile = testsWithBranches[0].branchSourceFile;
+        const merged = base.map((b, i) => {
+          const covered = testsWithBranches.some(t => t.branchAnalysis[i]?.covered);
+          return { ...b, covered, coverageNote: covered ? '' : b.coverageNote };
+        });
+        const uncovered = merged.filter(b => !b.covered);
+        const total = merged.length;
+        const covCount = total - uncovered.length;
+        const branchId = 'branch_' + modelName.replace(/[^a-zA-Z0-9]/g, '_');
+        renderedSectionIds.push(branchId);
+        const branchOpen = openSections[branchId] !== false;
+        const badgeColor = uncovered.length ? 'var(--or)' : 'var(--ac)';
+        const badgeBg = uncovered.length ? 'var(--orb)' : 'var(--acb)';
+        h += '<div class="card" style="border-color:' + badgeColor + '">';
+        h += '<div class="card-head clickable with-border" onclick="toggleSection(\'' + branchId + '\')">';
+        h += '<div style="display:flex;align-items:center;gap:10px">';
+        h += '<span class="arrow ' + (branchOpen ? 'open' : '') + '">\u25B6</span>';
+        h += '<span class="badge" style="color:' + badgeColor + ';background:' + badgeBg + '">Branch Coverage</span>';
+        h += '<span class="card-dim">' + covCount + '/' + total + ' branches covered</span>';
+        h += '</div></div>';
+        h += '<div class="card-body ' + (branchOpen ? 'open' : '') + '" id="' + branchId + '">';
         h += '<div style="padding:4px 18px 10px;display:flex;flex-direction:column;gap:4px">';
-        test.branchAnalysis.forEach(b => {
+        merged.forEach(b => {
           const color = b.covered ? 'var(--ac)' : 'var(--or)';
           const icon = b.covered ? '\u2713' : '\u2717';
-          const clickable = b.line && test.branchSourceFile;
-          const onclick = clickable ? ' onclick="openSourcePanel(' + jsStr(test.branchSourceFile) + ',' + b.line + ')" style="cursor:pointer;font-size:12px;font-family:var(--fn);display:flex;gap:8px;align-items:baseline;padding:2px 0;border-radius:3px;transition:background .1s" onmouseover="this.style.background=\'var(--sf2)\'" onmouseout="this.style.background=\'transparent\'"' : ' style="font-size:12px;font-family:var(--fn);display:flex;gap:8px;align-items:baseline;padding:2px 0"';
+          const clickable = b.line && branchSourceFile;
+          const onclick = clickable ? ' onclick="openSourcePanel(' + jsStr(branchSourceFile) + ',' + b.line + ')" style="cursor:pointer;font-size:12px;font-family:var(--fn);display:flex;gap:8px;align-items:baseline;padding:2px 0;border-radius:3px;transition:background .1s" onmouseover="this.style.background=\'var(--sf2)\'" onmouseout="this.style.background=\'transparent\'"' : ' style="font-size:12px;font-family:var(--fn);display:flex;gap:8px;align-items:baseline;padding:2px 0"';
           h += '<div' + onclick + '>';
           h += '<span style="color:' + color + '">' + icon + '</span>';
           h += '<span class="badge" style="color:var(--txm);background:var(--sf2);font-size:10px">' + esc(b.type) + '</span>';
           h += '<code style="color:var(--bl);font-size:12px">' + esc(b.condition) + '</code>';
-          if (b.line) { const bsf = test.branchSourceFile ? esc(test.branchSourceFile.split('/').pop()) + ':' : ''; h += '<span style="color:var(--txm);font-size:10px;font-family:var(--fn)">' + bsf + b.line + '</span>'; }
+          if (b.line) { const bsf = branchSourceFile ? esc(branchSourceFile.split('/').pop()) + ':' : ''; h += '<span style="color:var(--txm);font-size:10px;font-family:var(--fn)">' + bsf + b.line + '</span>'; }
           if (!b.covered) h += '<span style="color:var(--txm);font-size:11px;font-style:italic">' + esc(b.coverageNote) + '</span>';
           h += '</div>';
         });
-        h += '</div>';
+        h += '</div></div></div>';
       }
-
-      h += renderComment(key);
-      h += '</div></div>';
     }
 
     // Data tests
@@ -1151,6 +1235,7 @@ function render() {
       if (!matchFilter(key, 'data')) continue;
       if (searchQuery && !testMatchesSearch(test)) continue;
       const cardId = 'card_' + key.replace(/[^a-zA-Z0-9]/g, '_');
+      renderedSectionIds.push(cardId);
       const cardOpen = openSections[cardId] !== false;
       h += '<div class="card" data-review-key="' + esc(key) + '" onclick="focusCard(this)" style="' + cardBorderStyle(key) + '">';
       h += '<div class="card-head clickable with-border" onclick="toggleSection(\'' + cardId + '\')">';
@@ -1282,6 +1367,7 @@ function render() {
     // Coverage summary
     if (cov) {
       const covId = 'cov_' + modelName.replace(/[^a-zA-Z0-9]/g, '_');
+      renderedSectionIds.push(covId);
       const covOpen = openSections[covId] === true;
       h += '<div class="cov-summary">';
       h += '<div class="cov-head" onclick="toggleSection(\'' + covId + '\')">';
@@ -1682,6 +1768,28 @@ function generatePrompt() {
 window.setReview = function(key, status) { reviews[key] = status; render(); };
 window.setComment = function(key, val) { comments[key] = val; };
 window.setFilter = function(f) { filter = f; render(); };
+window.expandAll = function() {
+  renderedSectionIds.forEach(function(id) { openSections[id] = true; });
+  render();
+};
+window.collapseAll = function() {
+  renderedSectionIds.forEach(function(id) { openSections[id] = false; });
+  render();
+};
+window.scrollToCard = function(key, modelName) {
+  if (modelName) {
+    var modelId = 'model_' + modelName.replace(/[^a-zA-Z0-9]/g, '_');
+    if (openSections[modelId] === false) {
+      openSections[modelId] = true;
+      render();
+    }
+  }
+  var card = document.querySelector('.card[data-review-key="' + CSS.escape(key) + '"]');
+  if (card) {
+    card.scrollIntoView({ behavior: 'instant', block: 'center' });
+    focusCard(card);
+  }
+};
 window.toggleSection = function(id) {
   if (openSections[id] === undefined) {
     // Coverage sections (cov_*) default closed, all others default open
