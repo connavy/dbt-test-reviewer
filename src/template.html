@@ -975,6 +975,26 @@ function covColMatchesSearch(modelName, col) {
   return [modelName, col.name, col.description, col.data_type].filter(Boolean).join(' ').toLowerCase().includes(searchQuery);
 }
 
+function saveScrollState() {
+  var positions = {};
+  document.querySelectorAll('.tbl-wrap, .scroll-x').forEach(function(el, i) {
+    if (el.scrollLeft > 0) positions['tbl_' + i] = el.scrollLeft;
+  });
+  var main = document.querySelector('.main');
+  if (main && main.scrollTop > 0) positions['main_scrollTop'] = main.scrollTop;
+  return positions;
+}
+
+function restoreScrollState(positions) {
+  if (!positions || !Object.keys(positions).length) return;
+  document.querySelectorAll('.tbl-wrap, .scroll-x').forEach(function(el, i) {
+    var key = 'tbl_' + i;
+    if (positions[key] !== undefined) el.scrollLeft = positions[key];
+  });
+  var main = document.querySelector('.main');
+  if (main && positions['main_scrollTop'] !== undefined) main.scrollTop = positions['main_scrollTop'];
+}
+
 function render() {
   renderedSectionIds = [];
   const tests = selectedFile ? DATA.allTests.filter(t => t.sourceFile === selectedFile) : DATA.allTests;
@@ -1449,7 +1469,7 @@ function render() {
       // --- ENTITIES section ---
       if (sm.entities.length) {
         h += '<div style="padding:10px 18px 2px;font-size:10px;font-weight:700;font-family:var(--fn);color:var(--txm);letter-spacing:.05em;text-transform:uppercase">Entities</div>';
-        h += '<div style="padding:0 18px 8px;overflow-x:auto">';
+        h += '<div class="scroll-x" style="padding:0 18px 8px;overflow-x:auto">';
         h += '<table style="width:100%;border-collapse:collapse;font-size:12px">';
         h += '<thead><tr style="border-bottom:2px solid var(--bd)">';
         h += '<th style="padding:6px 12px 6px 0;text-align:left;font-size:10px;font-weight:700;font-family:var(--fn);color:var(--txm);letter-spacing:.03em">NAME</th>';
@@ -1477,7 +1497,7 @@ function render() {
         // Metrics section (simple/cumulative)
         if (simpleMetrics.length) {
           h += '<div style="padding:10px 18px 2px;font-size:10px;font-weight:700;font-family:var(--fn);color:var(--txm);letter-spacing:.05em;text-transform:uppercase">Metrics</div>';
-          h += '<div style="padding:0 18px 8px;overflow-x:auto">';
+          h += '<div class="scroll-x" style="padding:0 18px 8px;overflow-x:auto">';
           h += '<table style="width:100%;border-collapse:collapse;font-size:12px">';
           h += '<thead><tr style="border-bottom:2px solid var(--bd)">';
           h += '<th style="padding:6px 12px 6px 0;text-align:left;font-size:10px;font-weight:700;font-family:var(--fn);color:var(--txm);letter-spacing:.03em">METRIC</th>';
@@ -1532,7 +1552,7 @@ function render() {
         const orphanMeasures = sm.measures.filter(m => !referencedMeasures.has(m.name));
         if (orphanMeasures.length) {
           h += '<div style="padding:10px 18px 2px;font-size:10px;font-weight:700;font-family:var(--fn);color:var(--or);letter-spacing:.05em;text-transform:uppercase">Measures without Metrics</div>';
-          h += '<div style="padding:0 18px 8px;overflow-x:auto">';
+          h += '<div class="scroll-x" style="padding:0 18px 8px;overflow-x:auto">';
           h += '<table style="width:100%;border-collapse:collapse;font-size:12px">';
           h += '<thead><tr style="border-bottom:2px solid var(--bd)">';
           h += '<th style="padding:6px 12px 6px 0;text-align:left;font-size:10px;font-weight:700;font-family:var(--fn);color:var(--txm);letter-spacing:.03em">MEASURE</th>';
@@ -1554,7 +1574,7 @@ function render() {
         // No metrics defined at all — show raw measures
         if (!simpleMetrics.length && !derivedMetrics.length && sm.measures.length) {
           h += '<div style="padding:10px 18px 2px;font-size:10px;font-weight:700;font-family:var(--fn);color:var(--txm);letter-spacing:.05em;text-transform:uppercase">Measures</div>';
-          h += '<div style="padding:0 18px 8px;overflow-x:auto">';
+          h += '<div class="scroll-x" style="padding:0 18px 8px;overflow-x:auto">';
           h += '<table style="width:100%;border-collapse:collapse;font-size:12px">';
           h += '<thead><tr style="border-bottom:2px solid var(--bd)">';
           h += '<th style="padding:6px 12px 6px 0;text-align:left;font-size:10px;font-weight:700;font-family:var(--fn);color:var(--txm);letter-spacing:.03em">MEASURE</th>';
@@ -1577,7 +1597,7 @@ function render() {
       // --- DERIVED METRICS section ---
       if (derivedMetrics.length) {
         h += '<div style="padding:10px 18px 2px;font-size:10px;font-weight:700;font-family:var(--fn);color:var(--txm);letter-spacing:.05em;text-transform:uppercase">Derived Metrics</div>';
-        h += '<div style="padding:0 18px 8px;overflow-x:auto">';
+        h += '<div class="scroll-x" style="padding:0 18px 8px;overflow-x:auto">';
         h += '<table style="width:100%;border-collapse:collapse;font-size:12px">';
         h += '<thead><tr style="border-bottom:2px solid var(--bd)">';
         h += '<th style="padding:6px 12px 6px 0;text-align:left;font-size:10px;font-weight:700;font-family:var(--fn);color:var(--txm);letter-spacing:.03em">NAME</th>';
@@ -1601,7 +1621,7 @@ function render() {
       // --- DIMENSIONS section ---
       if (sm.dimensions.length) {
         h += '<div style="padding:10px 18px 2px;font-size:10px;font-weight:700;font-family:var(--fn);color:var(--txm);letter-spacing:.05em;text-transform:uppercase">Dimensions</div>';
-        h += '<div style="padding:0 18px 8px;overflow-x:auto">';
+        h += '<div class="scroll-x" style="padding:0 18px 8px;overflow-x:auto">';
         h += '<table style="width:100%;border-collapse:collapse;font-size:12px">';
         h += '<thead><tr style="border-bottom:2px solid var(--bd)">';
         h += '<th style="padding:6px 12px 6px 0;text-align:left;font-size:10px;font-weight:700;font-family:var(--fn);color:var(--txm);letter-spacing:.03em">NAME</th>';
@@ -1713,7 +1733,9 @@ function render() {
 
   h += renderExportPanel(stats);
   h += '</div>'; // close content padding wrapper
+  var savedScroll = saveScrollState();
   document.getElementById('app').innerHTML = h;
+  restoreScrollState(savedScroll);
   renderSidebar();
 }
 
