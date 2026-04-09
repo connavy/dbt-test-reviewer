@@ -646,6 +646,11 @@ async function poll() {
       if (si) si.innerHTML = '<span class="live-dot"></span>Live \u2014 Auto-refreshes on file changes';
     }
     if (JSON.stringify(d) !== JSON.stringify(DATA)) {
+      var sel = window.getSelection();
+      if (sel && sel.toString().length > 0) {
+        DATA = d;
+        return; // defer render while user has text selected
+      }
       DATA = d;
       initReviewKeys(DATA);
       clearTimeout(searchDebounceTimer);
