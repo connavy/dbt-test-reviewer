@@ -192,6 +192,35 @@ unit_tests:
     deepStrictEqual(extractUnitTests({}), []);
     deepStrictEqual(extractUnitTests({ models: [] }), []);
   });
+
+  it("extracts overrides when present", () => {
+    const parsed = {
+      unit_tests: [{
+        name: "test_with_overrides",
+        model: "my_model",
+        overrides: {
+          vars: { home_club_cd: "TO", as_of_date: "2026-03-17" }
+        },
+        given: [],
+        expect: { rows: [] }
+      }]
+    };
+    const result = extractUnitTests(parsed);
+    deepStrictEqual(result[0].overrides, { vars: { home_club_cd: "TO", as_of_date: "2026-03-17" } });
+  });
+
+  it("returns null overrides when not present", () => {
+    const parsed = {
+      unit_tests: [{
+        name: "test_no_overrides",
+        model: "my_model",
+        given: [],
+        expect: { rows: [] }
+      }]
+    };
+    const result = extractUnitTests(parsed);
+    strictEqual(result[0].overrides, null);
+  });
 });
 
 /* ═══════════════════════════════════════════════

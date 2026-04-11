@@ -241,6 +241,7 @@ export function extractUnitTests(p) {
             ? [{ _fixture: t.expect.fixture }]
             : []
       : [],
+    overrides: t.overrides && typeof t.overrides === "object" ? t.overrides : null,
   }));
 }
 
