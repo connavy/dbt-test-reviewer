@@ -1205,6 +1205,35 @@ function render() {
       h += '</div>' + renderReviewBtns(key) + '</div>';
       h += '<div class="card-body ' + (cardOpen ? 'open' : '') + '" id="' + cardId + '">';
       if (test.description) h += '<div style="padding:8px 18px;font-size:13px;color:var(--txd);border-bottom:1px solid var(--bd)">' + esc(test.description) + '</div>';
+      // Overrides section
+      if (test.overrides && typeof test.overrides === 'object') {
+        const overrideRows = [];
+        for (const [category, values] of Object.entries(test.overrides)) {
+          if (values && typeof values === 'object') {
+            for (const [k, v] of Object.entries(values)) {
+              overrideRows.push({ type: category, key: k, value: v });
+            }
+          }
+        }
+        if (overrideRows.length) {
+          h += '<div class="section-label" style="color:var(--bl)">\u2261 OVERRIDES</div>';
+          h += '<div class="tbl-wrap">';
+          h += '<table style="width:100%;border-collapse:collapse;font-size:12px">';
+          h += '<thead><tr style="border-bottom:2px solid var(--bd)">';
+          h += '<th style="padding:6px 12px 6px 0;text-align:left;font-size:10px;font-weight:700;font-family:var(--fn);color:var(--txm);letter-spacing:.03em">TYPE</th>';
+          h += '<th style="padding:6px 12px 6px 0;text-align:left;font-size:10px;font-weight:700;font-family:var(--fn);color:var(--txm);letter-spacing:.03em">KEY</th>';
+          h += '<th style="padding:6px 0;text-align:left;font-size:10px;font-weight:700;font-family:var(--fn);color:var(--txm);letter-spacing:.03em">VALUE</th>';
+          h += '</tr></thead><tbody>';
+          overrideRows.forEach(row => {
+            h += '<tr style="border-bottom:1px solid var(--bd)">';
+            h += '<td style="padding:5px 12px 5px 0;font-family:var(--fn);color:var(--txm);font-size:11px">' + esc(row.type) + '</td>';
+            h += '<td style="padding:5px 12px 5px 0;font-family:var(--fn);color:var(--bl);font-weight:600;font-size:11px">' + esc(row.key) + '</td>';
+            h += '<td style="padding:5px 0;font-family:var(--fn);color:var(--or);font-size:11px">' + esc(String(row.value)) + '</td>';
+            h += '</tr>';
+          });
+          h += '</tbody></table></div>';
+        }
+      }
       h += '<div class="section-label" style="color:var(--bl)">\u2193 INPUT (given)</div>';
       test.given.forEach(g => {
         if (!g.rows || !g.rows.length) return;
