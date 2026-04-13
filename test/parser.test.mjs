@@ -221,6 +221,39 @@ unit_tests:
     const result = extractUnitTests(parsed);
     strictEqual(result[0].overrides, null);
   });
+
+  it("parses multi-line flow mapping rows", () => {
+    const yaml = `
+unit_tests:
+  - name: test_multi_line_flow
+    model: my_model
+    given:
+      - input: ref('source_model')
+        rows:
+          - {
+              col_a: 'val1',
+              col_b: 123
+            }
+          - {
+              col_a: 'val2',
+              col_b: 456
+            }
+    expect:
+      rows:
+        - {
+            col_a: 'val1',
+            result: 100
+          }
+`;
+    const parsed = parseYaml(yaml);
+    const result = extractUnitTests(parsed);
+    strictEqual(result.length, 1);
+    strictEqual(result[0].given[0].rows.length, 2);
+    deepStrictEqual(result[0].given[0].rows[0], { col_a: "val1", col_b: 123 });
+    deepStrictEqual(result[0].given[0].rows[1], { col_a: "val2", col_b: 456 });
+    strictEqual(result[0].expect.length, 1);
+    deepStrictEqual(result[0].expect[0], { col_a: "val1", result: 100 });
+  });
 });
 
 /* ═══════════════════════════════════════════════

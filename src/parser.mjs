@@ -139,6 +139,18 @@ export function parseYaml(text) {
     }
     return r;
   }
+  function collectFlowMapping(firstLine) {
+    if (firstLine.includes('}')) return firstLine;
+    let joined = firstLine;
+    while (pos < lines.length) {
+      const n = peek();
+      if (!n) break;
+      joined += ' ' + n.content;
+      pos++;
+      if (n.content.includes('}')) break;
+    }
+    return joined;
+  }
   function parseSeq(li, depth = 0) {
     const r = [];
     while (pos < lines.length) {
@@ -150,8 +162,9 @@ export function parseYaml(text) {
         const n = peek();
         r.push(n && n.indent > li ? parseNode(n.indent, depth + 1) : null);
       } else if (after.startsWith("{")) {
-        r.push(parseInlineObj(after));
         pos++;
+        const joined = collectFlowMapping(after);
+        r.push(parseInlineObj(joined));
       } else if (after.includes(":")) {
         const ici = li + 2;
         const ci = after.indexOf(":");
