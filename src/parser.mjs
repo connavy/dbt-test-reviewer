@@ -527,7 +527,8 @@ export function parseDataTestSQL(sql) {
   const sources = [
     ...sql.matchAll(/\{\{\s*source\(['"]([^'"]+)['"],\s*['"]([^'"]+)['"]\)\s*\}\}/g),
   ].map((m) => `${m[1]}.${m[2]}`);
-  return { type: "data", name, description: desc, sql, inputs: [...refs, ...sources] };
+  const model = refs[0] || null;
+  return { type: "data", name, description: desc, sql, inputs: [...refs, ...sources], model };
 }
 
 /* ═══════════════════════════════════════════════

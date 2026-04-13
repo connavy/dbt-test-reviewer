@@ -400,6 +400,7 @@ WHERE o.total != li.sum_amount
       "raw.payments",
     ]);
     strictEqual(result.sql, sql);
+    strictEqual(result.model, "fct_orders");
   });
 
   it("defaults name to 'Data Test' when no comment present", () => {
@@ -408,6 +409,7 @@ WHERE o.total != li.sum_amount
     strictEqual(result.name, "Data Test");
     strictEqual(result.description, "");
     deepStrictEqual(result.inputs, ["some_model"]);
+    strictEqual(result.model, "some_model");
   });
 
   it("handles SQL with no refs or sources", () => {
@@ -415,6 +417,24 @@ WHERE o.total != li.sum_amount
     const result = parseDataTestSQL(sql);
     strictEqual(result.name, "simple_test");
     deepStrictEqual(result.inputs, []);
+    strictEqual(result.model, null);
+  });
+
+  it("sets model to first ref when multiple refs exist", () => {
+    const sql = `-- name: check_join
+SELECT * FROM {{ ref('dim_customers') }}
+JOIN {{ ref('fct_orders') }} ON dim_customers.id = fct_orders.customer_id`;
+    const result = parseDataTestSQL(sql);
+    strictEqual(result.model, "dim_customers");
+    deepStrictEqual(result.inputs, ["dim_customers", "fct_orders"]);
+  });
+
+  it("sets model to null when only sources are present", () => {
+    const sql = `-- name: check_raw
+SELECT * FROM {{ source('raw', 'events') }}`;
+    const result = parseDataTestSQL(sql);
+    strictEqual(result.model, null);
+    deepStrictEqual(result.inputs, ["raw.events"]);
   });
 });
 
