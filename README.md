@@ -39,6 +39,7 @@ Open http://localhost:3456 in your browser.
 
 - **3-column layout** — file sidebar | review cards | CTE graph & source viewer
 - **Review workflow** — OK / Needs Change / Pending buttons with comments per test/column
+- **Review persistence** — restores statuses and comments in the same browser for the same project/branch
 - **Coverage tracking** — classifies every column as tested / excluded (`meta.no_test`) / untested
 - **Branch coverage** — detects CASE/COALESCE/IIF branches in SQL with clickable line references
 - **Semantic Layer** — parses MetricFlow `semantic_models` and `metrics`, cross-references test coverage
