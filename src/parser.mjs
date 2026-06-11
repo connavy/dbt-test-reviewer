@@ -578,8 +578,12 @@ export function extractBranches(sql) {
     const val = m[1].trim();
     if (val) branches.push({ type: "case_else", condition: "ELSE", line: offsetToLine(m.index), _offset: m.index });
   }
-  // COALESCE
-  for (const m of cleaned.matchAll(/COALESCE\s*\(([^,)]+)/gi)) {
+  // COALESCE — skip when fallback is a literal (just a default value, not a branch)
+  for (const m of cleaned.matchAll(/COALESCE\s*\(([^,)]+),\s*([^,)]+)/gi)) {
+    const fallback = m[2].trim();
+    if (/^['"].*['"]$/.test(fallback)) continue;
+    if (/^-?\d+(\.\d+)?$/.test(fallback)) continue;
+    if (/^(TRUE|FALSE|NULL)$/i.test(fallback)) continue;
     branches.push({ type: "coalesce", condition: `${m[1].trim()} IS NULL`, line: offsetToLine(m.index) });
   }
   // IIF / IF

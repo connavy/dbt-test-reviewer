@@ -552,12 +552,40 @@ FROM t
     strictEqual(elses[0].condition, "ELSE");
   });
 
-  it("detects COALESCE", () => {
+  it("detects COALESCE with column fallback", () => {
     const sql = `SELECT COALESCE(nickname, full_name) FROM users`;
     const result = extractBranches(sql);
     const coalesces = result.filter((b) => b.type === "coalesce");
     strictEqual(coalesces.length, 1);
     strictEqual(coalesces[0].condition, "nickname IS NULL");
+  });
+
+  it("skips COALESCE with string literal fallback", () => {
+    const sql = `SELECT COALESCE(col, 'default') FROM t`;
+    const result = extractBranches(sql);
+    const coalesces = result.filter((b) => b.type === "coalesce");
+    strictEqual(coalesces.length, 0);
+  });
+
+  it("skips COALESCE with numeric literal fallback", () => {
+    const sql = `SELECT COALESCE(col, 0) FROM t`;
+    const result = extractBranches(sql);
+    const coalesces = result.filter((b) => b.type === "coalesce");
+    strictEqual(coalesces.length, 0);
+  });
+
+  it("skips COALESCE with NULL fallback", () => {
+    const sql = `SELECT COALESCE(col, NULL) FROM t`;
+    const result = extractBranches(sql);
+    const coalesces = result.filter((b) => b.type === "coalesce");
+    strictEqual(coalesces.length, 0);
+  });
+
+  it("skips COALESCE with boolean fallback", () => {
+    const sql = `SELECT COALESCE(col, FALSE) FROM t`;
+    const result = extractBranches(sql);
+    const coalesces = result.filter((b) => b.type === "coalesce");
+    strictEqual(coalesces.length, 0);
   });
 
   it("detects IIF", () => {
