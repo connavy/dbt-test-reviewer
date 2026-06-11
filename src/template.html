@@ -193,6 +193,9 @@ let renderedSectionIds = [];
 
 function reviewKey(t) {
   if (t.type === 'schema' && t.column !== '(model-level)') return 'col:' + t.model + ':' + t.column;
+  if (t.type === 'schema' && t.column === '(model-level)') {
+    return 'model-test:' + (t.model || '') + ':' + t.name + ':' + hashString(stableStringifyReviewValue(t.config || {}));
+  }
   return t.type + ':' + t.name + ':' + (t.model || '');
 }
 
@@ -599,6 +602,7 @@ function init() {
     if (parts.length) hc.textContent = parts.join(' ');
   }
   initReviewKeys(DATA);
+  loadReviewState(DATA);
   if (DATA.parseErrors && DATA.parseErrors.length) {
     const si2 = document.getElementById('status-indicator');
     if (si2) si2.innerHTML += ' <span style="color:var(--rd);font-size:11px">\u26A0 ' + DATA.parseErrors.length + ' file(s) failed to parse</span>';
@@ -633,6 +637,113 @@ function initReviewKeys(data) {
   }
 }
 
+// --- Review persistence ---
+const REVIEW_STORAGE_PREFIX = 'dbt-reviewer-review-state:v1:';
+
+function stableStringifyReviewValue(value) {
+  if (Array.isArray(value)) {
+    return '[' + value.map(stableStringifyReviewValue).join(',') + ']';
+  }
+  if (value && typeof value === 'object') {
+    return '{' + Object.keys(value).sort().map(function(key) {
+      return JSON.stringify(key) + ':' + stableStringifyReviewValue(value[key]);
+    }).join(',') + '}';
+  }
+  return JSON.stringify(value);
+}
+
+function hashString(value) {
+  var hash = 2166136261;
+  for (var i = 0; i < value.length; i++) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(36);
+}
+
+function getReviewStorageKey(data) {
+  var ctx = (data && data.context) || {};
+  var path = (typeof location !== 'undefined' && location.pathname) ? location.pathname : 'unknown-location';
+  var scope = [
+    ctx.dir || path,
+    ctx.gitBranch || 'no-branch',
+  ].join('|');
+  return REVIEW_STORAGE_PREFIX + hashString(scope);
+}
+
+function getReviewItemKeys(data) {
+  var keys = new Set();
+  ((data && data.allTests) || []).forEach(function(t) {
+    keys.add(reviewKey(t));
+  });
+  ((data && data.coverageData) || []).forEach(function(cov) {
+    (cov.columns || []).filter(function(c) {
+      return c.status === 'untested' || c.status === 'excluded';
+    }).forEach(function(c) {
+      keys.add('col:' + cov.model + ':' + c.name);
+    });
+  });
+  ((data && data.semanticModels) || []).forEach(function(sm) {
+    keys.add('semantic:' + sm.name + ':' + sm.modelRef);
+  });
+  return keys;
+}
+
+function isReviewStatus(value) {
+  return value === 'approved' || value === 'needs_change' || value === 'pending';
+}
+
+function loadReviewState(data) {
+  try {
+    var raw = localStorage.getItem(getReviewStorageKey(data));
+    if (!raw) return false;
+    var saved = JSON.parse(raw);
+    if (!saved || saved.version !== 1) return false;
+    var keys = getReviewItemKeys(data);
+    Object.entries(saved.reviews || {}).forEach(function(entry) {
+      var key = entry[0], status = entry[1];
+      if (keys.has(key) && isReviewStatus(status)) reviews[key] = status;
+    });
+    Object.entries(saved.comments || {}).forEach(function(entry) {
+      var key = entry[0], comment = entry[1];
+      if (keys.has(key) && typeof comment === 'string') comments[key] = comment;
+    });
+    return true;
+  } catch (e) {
+    console.warn('Failed to load saved review state:', e.message);
+    return false;
+  }
+}
+
+function saveReviewState() {
+  try {
+    var keys = getReviewItemKeys(DATA);
+    var savedReviews = {};
+    var savedComments = {};
+    keys.forEach(function(key) {
+      var status = reviews[key];
+      var comment = comments[key];
+      if (status && status !== 'pending' && isReviewStatus(status)) savedReviews[key] = status;
+      if (typeof comment === 'string' && comment.trim()) savedComments[key] = comment;
+    });
+    var key = getReviewStorageKey(DATA);
+    if (!Object.keys(savedReviews).length && !Object.keys(savedComments).length) {
+      localStorage.removeItem(key);
+      return true;
+    }
+    localStorage.setItem(key, JSON.stringify({
+      version: 1,
+      savedAt: new Date().toISOString(),
+      reviews: savedReviews,
+      comments: savedComments,
+    }));
+    return true;
+  } catch (e) {
+    console.warn('Failed to save review state:', e.message);
+    return false;
+  }
+}
+
 let pollFailCount = 0;
 async function poll() {
   if (DATA.demoMode) return;
@@ -653,6 +764,7 @@ async function poll() {
       }
       DATA = d;
       initReviewKeys(DATA);
+      loadReviewState(DATA);
       clearTimeout(searchDebounceTimer);
       render(); renderSidebar();
     }
@@ -1877,8 +1989,8 @@ function generatePrompt() {
   return p;
 }
 
-window.setReview = function(key, status) { reviews[key] = status; render(); };
-window.setComment = function(key, val) { comments[key] = val; };
+window.setReview = function(key, status) { reviews[key] = status; saveReviewState(); render(); };
+window.setComment = function(key, val) { comments[key] = val; saveReviewState(); };
 window.setFilter = function(f) { filter = f; render(); };
 window.expandAll = function() {
   renderedSectionIds.forEach(function(id) { openSections[id] = true; });

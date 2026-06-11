@@ -221,6 +221,39 @@ unit_tests:
     const result = extractUnitTests(parsed);
     strictEqual(result[0].overrides, null);
   });
+
+  it("parses multi-line flow mapping rows", () => {
+    const yaml = `
+unit_tests:
+  - name: test_multi_line_flow
+    model: my_model
+    given:
+      - input: ref('source_model')
+        rows:
+          - {
+              col_a: 'val1',
+              col_b: 123
+            }
+          - {
+              col_a: 'val2',
+              col_b: 456
+            }
+    expect:
+      rows:
+        - {
+            col_a: 'val1',
+            result: 100
+          }
+`;
+    const parsed = parseYaml(yaml);
+    const result = extractUnitTests(parsed);
+    strictEqual(result.length, 1);
+    strictEqual(result[0].given[0].rows.length, 2);
+    deepStrictEqual(result[0].given[0].rows[0], { col_a: "val1", col_b: 123 });
+    deepStrictEqual(result[0].given[0].rows[1], { col_a: "val2", col_b: 456 });
+    strictEqual(result[0].expect.length, 1);
+    deepStrictEqual(result[0].expect[0], { col_a: "val1", result: 100 });
+  });
 });
 
 /* ═══════════════════════════════════════════════
@@ -400,6 +433,7 @@ WHERE o.total != li.sum_amount
       "raw.payments",
     ]);
     strictEqual(result.sql, sql);
+    strictEqual(result.model, "fct_orders");
   });
 
   it("defaults name to 'Data Test' when no comment present", () => {
@@ -408,6 +442,7 @@ WHERE o.total != li.sum_amount
     strictEqual(result.name, "Data Test");
     strictEqual(result.description, "");
     deepStrictEqual(result.inputs, ["some_model"]);
+    strictEqual(result.model, "some_model");
   });
 
   it("handles SQL with no refs or sources", () => {
@@ -415,6 +450,24 @@ WHERE o.total != li.sum_amount
     const result = parseDataTestSQL(sql);
     strictEqual(result.name, "simple_test");
     deepStrictEqual(result.inputs, []);
+    strictEqual(result.model, null);
+  });
+
+  it("sets model to first ref when multiple refs exist", () => {
+    const sql = `-- name: check_join
+SELECT * FROM {{ ref('dim_customers') }}
+JOIN {{ ref('fct_orders') }} ON dim_customers.id = fct_orders.customer_id`;
+    const result = parseDataTestSQL(sql);
+    strictEqual(result.model, "dim_customers");
+    deepStrictEqual(result.inputs, ["dim_customers", "fct_orders"]);
+  });
+
+  it("sets model to null when only sources are present", () => {
+    const sql = `-- name: check_raw
+SELECT * FROM {{ source('raw', 'events') }}`;
+    const result = parseDataTestSQL(sql);
+    strictEqual(result.model, null);
+    deepStrictEqual(result.inputs, ["raw.events"]);
   });
 });
 
@@ -499,12 +552,40 @@ FROM t
     strictEqual(elses[0].condition, "ELSE");
   });
 
-  it("detects COALESCE", () => {
+  it("detects COALESCE with column fallback", () => {
     const sql = `SELECT COALESCE(nickname, full_name) FROM users`;
     const result = extractBranches(sql);
     const coalesces = result.filter((b) => b.type === "coalesce");
     strictEqual(coalesces.length, 1);
     strictEqual(coalesces[0].condition, "nickname IS NULL");
+  });
+
+  it("skips COALESCE with string literal fallback", () => {
+    const sql = `SELECT COALESCE(col, 'default') FROM t`;
+    const result = extractBranches(sql);
+    const coalesces = result.filter((b) => b.type === "coalesce");
+    strictEqual(coalesces.length, 0);
+  });
+
+  it("skips COALESCE with numeric literal fallback", () => {
+    const sql = `SELECT COALESCE(col, 0) FROM t`;
+    const result = extractBranches(sql);
+    const coalesces = result.filter((b) => b.type === "coalesce");
+    strictEqual(coalesces.length, 0);
+  });
+
+  it("skips COALESCE with NULL fallback", () => {
+    const sql = `SELECT COALESCE(col, NULL) FROM t`;
+    const result = extractBranches(sql);
+    const coalesces = result.filter((b) => b.type === "coalesce");
+    strictEqual(coalesces.length, 0);
+  });
+
+  it("skips COALESCE with boolean fallback", () => {
+    const sql = `SELECT COALESCE(col, FALSE) FROM t`;
+    const result = extractBranches(sql);
+    const coalesces = result.filter((b) => b.type === "coalesce");
+    strictEqual(coalesces.length, 0);
   });
 
   it("detects IIF", () => {
