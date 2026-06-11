@@ -762,11 +762,37 @@ async function poll() {
         DATA = d;
         return; // defer render while user has text selected
       }
+      var ae = document.activeElement;
+      if (ae && (ae.tagName === 'TEXTAREA' || ae.tagName === 'INPUT')) {
+        DATA = d;
+        return; // defer render while user is typing
+      }
       DATA = d;
       initReviewKeys(DATA);
       loadReviewState(DATA);
       clearTimeout(searchDebounceTimer);
-      render(); renderSidebar();
+
+      // Save focus state
+      var focusedEl = document.querySelector('.card.focused');
+      var focusedKey = focusedEl ? focusedEl.dataset.reviewKey : null;
+
+      var result = buildAppHtml();
+      renderedSectionIds = result.sectionIds;
+      patchApp(result.html);
+      renderSidebar();
+
+      // Restore focus
+      if (focusedKey) {
+        var cards = getReviewCards();
+        var idx = -1;
+        for (var fi = 0; fi < cards.length; fi++) {
+          if (cards[fi].dataset.reviewKey === focusedKey) { idx = fi; break; }
+        }
+        if (idx >= 0) {
+          focusedCardIndex = idx;
+          cards[idx].classList.add('focused');
+        }
+      }
     }
   } catch (e) {
     pollFailCount++;
@@ -1112,8 +1138,8 @@ function restoreScrollState(positions) {
   if (main && positions['main_scrollTop'] !== undefined) main.scrollTop = positions['main_scrollTop'];
 }
 
-function render() {
-  renderedSectionIds = [];
+function buildAppHtml() {
+  const sectionIds = [];
   const tests = selectedFile ? DATA.allTests.filter(t => t.sourceFile === selectedFile) : DATA.allTests;
   const coverage = selectedFile ? (DATA.coverageData || []).filter(c => c.sourceFile === selectedFile) : (DATA.coverageData || []);
   const fileSM = selectedFile ? (DATA.semanticModels || []).filter(sm => sm.sourceFile === selectedFile) : (DATA.semanticModels || []);
@@ -1143,7 +1169,7 @@ function render() {
   semanticKeys.forEach(k => { stats[reviews[k] || 'pending']++; });
 
   let h = '';
-  h += '<div style="position:sticky;top:0;z-index:10;background:var(--bg);padding:16px 16px 0;border-bottom:1px solid var(--bd);box-shadow:0 -20px 0 20px var(--bg)">';
+  h += '<div id="review-header" style="position:sticky;top:0;z-index:10;background:var(--bg);padding:16px 16px 0;border-bottom:1px solid var(--bd);box-shadow:0 -20px 0 20px var(--bg)">';
   h += '<div style="margin-bottom:10px;font-size:12px;color:var(--txd)">';
   if (selectedFile) {
     h += '<span style="color:var(--bl);cursor:pointer" onclick="selectFile(null)">\u2190 All Files</span> / ';
@@ -1201,7 +1227,7 @@ function render() {
   const pct = stats.total ? Math.round(reviewed / stats.total * 100) : 0;
   h += '<div class="progress-text">' + reviewed + '/' + stats.total + ' reviewed (' + pct + '%)</div>';
   h += '</div>';
-  h += '<div style="padding:16px">';
+  h += '<div id="review-content" style="padding:16px">';
 
   const q = searchQuery.toLowerCase();
   const searchedTests = searchQuery ? tests.filter(t => testMatchesSearch(t)) : tests;
@@ -1227,7 +1253,7 @@ function render() {
   let hasVisibleContent = false;
   for (const [modelName, group] of Object.entries(models)) {
     const modelId = 'model_' + modelName.replace(/[^a-zA-Z0-9]/g, '_');
-    renderedSectionIds.push(modelId);
+    sectionIds.push(modelId);
     const cov = coverage.find(c => c.model === modelName);
     const testCount = group.unit.length + group.schema.length + group.data.length + group.modelLevel.length;
 
@@ -1262,7 +1288,7 @@ function render() {
     const cteResults = DATA.cteResults || {};
     const modelCTEFile = Object.keys(cteResults).find(f => f.split('/').pop().replace(/\.sql$/i, '') === modelName);
 
-    h += '<div class="model-group">';
+    h += '<div class="model-group" id="mg_' + modelId + '">';
     h += '<div class="model-head" onclick="toggleSection(\'' + modelId + '\')">';
     h += '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">';
     h += '<span class="arrow ' + (isOpen ? 'open' : '') + '">\u25B6</span>';
@@ -1884,8 +1910,105 @@ function render() {
 
   h += renderExportPanel(stats);
   h += '</div>'; // close content padding wrapper
+  return { html: h, sectionIds: sectionIds };
+}
+
+function patchApp(newHtml) {
+  var app = document.getElementById('app');
+
+  // First render or structure mismatch: full replace
+  if (!app.querySelector('#review-header')) {
+    app.innerHTML = newHtml; // trusted internal HTML
+    return;
+  }
+
+  // Parse new HTML off-screen
+  var tmp = document.createElement('div');
+  tmp.innerHTML = newHtml; // trusted internal HTML
+
+  // --- Header: always replace ---
+  var oh = app.querySelector('#review-header');
+  var nh = tmp.querySelector('#review-header');
+  if (oh && nh && oh.innerHTML !== nh.innerHTML) {
+    oh.innerHTML = nh.innerHTML; // trusted internal HTML
+  }
+
+  // --- Model groups: diff update ---
+  var oc = app.querySelector('#review-content');
+  var nc = tmp.querySelector('#review-content');
+  if (!oc || !nc) {
+    app.innerHTML = newHtml; // trusted internal HTML
+    return;
+  }
+
+  // Old groups map
+  var oldMap = new Map();
+  oc.querySelectorAll(':scope > .model-group[id]').forEach(function(el) {
+    oldMap.set(el.id, el);
+  });
+
+  // Separate new groups and non-group elements
+  var newGroups = [];
+  var newOther = [];
+  Array.from(nc.children).forEach(function(el) {
+    if (el.classList.contains('model-group') && el.id) {
+      newGroups.push(el);
+    } else {
+      newOther.push(el);
+    }
+  });
+
+  // Remove stale old groups
+  var newIdSet = new Set(newGroups.map(function(g) { return g.id; }));
+  oldMap.forEach(function(el, id) {
+    if (!newIdSet.has(id)) el.remove();
+  });
+
+  // Process new groups in order
+  var prevEl = null;
+  newGroups.forEach(function(ng) {
+    var existing = oldMap.get(ng.id);
+    if (existing) {
+      if (existing.innerHTML !== ng.innerHTML) {
+        // Save table scroll positions -> replace -> restore
+        var scrolls = [];
+        existing.querySelectorAll('.tbl-wrap, .scroll-x').forEach(function(s) {
+          scrolls.push(s.scrollLeft);
+        });
+        existing.innerHTML = ng.innerHTML; // trusted internal HTML
+        existing.querySelectorAll('.tbl-wrap, .scroll-x').forEach(function(s, i) {
+          if (scrolls[i]) s.scrollLeft = scrolls[i];
+        });
+      }
+      prevEl = existing;
+    } else {
+      // Insert new group
+      var clone = ng.cloneNode(true);
+      if (prevEl && prevEl.nextSibling) {
+        oc.insertBefore(clone, prevEl.nextSibling);
+      } else if (!prevEl) {
+        oc.insertBefore(clone, oc.firstChild);
+      } else {
+        oc.appendChild(clone);
+      }
+      prevEl = clone;
+    }
+  });
+
+  // Replace non-group elements (export panel, no-results)
+  Array.from(oc.children).forEach(function(el) {
+    if (!el.classList.contains('model-group')) el.remove();
+  });
+  newOther.forEach(function(el) {
+    oc.appendChild(el.cloneNode(true));
+  });
+}
+
+function render() {
+  var result = buildAppHtml();
+  renderedSectionIds = result.sectionIds;
   var savedScroll = saveScrollState();
-  document.getElementById('app').innerHTML = h;
+  document.getElementById('app').innerHTML = result.html; // trusted internal HTML
   restoreScrollState(savedScroll);
   renderSidebar();
 }
